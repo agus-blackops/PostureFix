@@ -6,7 +6,9 @@ la voz cuenta **"uno… dos… tres"** y salta una alerta fuerte con notificaci�
 prioridad, vibración larga y un tono continuo. Con auriculares puestos, ese tono es la señal
 de atención **EAS** (853 Hz + 960 Hz), la misma que precede a los avisos de tornado.
 
-Hecha con Expo (React Native + TypeScript).
+Hecha con Expo (React Native + TypeScript). Hay dos versiones que comparten la misma
+secuencia de alerta: la **app de móvil**, que mide con el acelerómetro, y la
+**versión para portátil**, que mide con la webcam.
 
 ## Cómo funciona
 
@@ -41,7 +43,7 @@ del sistema (`AudioManager` en Android, `AVAudioSession` en iOS) y avisa a la ap
 conectan o desconectan auriculares de cable, USB o Bluetooth. En Expo Go, donde el módulo
 nativo no está compilado, la app cae en el interruptor **"Llevo auriculares"** de los ajustes.
 
-## Ejecutar
+## Ejecutar (móvil)
 
 ```bash
 npm install
@@ -58,10 +60,57 @@ npx expo run:android    # o: npx expo run:ios   (requiere macOS + Xcode)
 ### Comprobaciones
 
 ```bash
-npm test        # tests de la máquina de estados y de la trigonometría
+npm test        # máquina de estados, trigonometría y medición por webcam
 npm run typecheck
 npm run assets  # regenera sonidos e iconos
 ```
+
+## Versión para portátil (webcam)
+
+La misma alerta, pero midiendo la postura con la webcam en lugar del acelerómetro: pensada
+para cuando estás sentado delante de un portátil (HP, Asus, cualquiera con cámara).
+
+```bash
+npm install
+npm run web:dev      # http://localhost:8080
+```
+
+`npm run web:build` deja la app lista en `web/dist/` para servirla donde quieras. Hace falta
+`localhost` o `https://`, que es lo único que acepta el navegador para dar acceso a la cámara.
+
+### Qué mide
+
+Una cámara frontal no ve la curva de la columna, pero sí cuatro señales que la delatan, todas
+comparadas con una calibración previa y normalizadas con la anchura de tus hombros (así no
+dependen de tu estatura ni de la distancia a la pantalla):
+
+| Indicador | Qué detecta |
+| --- | --- |
+| `hunch` | Las orejas se acercan a los hombros: te encorvas |
+| `lean` | Los hombros se ven más anchos: te echas sobre la pantalla |
+| `slide` | Los hombros bajan en el encuadre: te escurres en la silla |
+| `tilt` | La línea de los hombros se inclina: te ladeas |
+
+Se toma el peor de los cuatro (no la suma) y se traduce a "grados equivalentes", de modo que
+la máquina de estados y el umbral son exactamente los mismos que en el móvil. La interfaz dice
+cuál de los cuatro está mandando.
+
+### Qué comparte con la app de móvil
+
+- `src/core/postureEngine.ts`: la secuencia pitido → cuenta → alarma, idéntica.
+- Los tres WAV: pitido, tono EAS y sirena.
+- La voz es `speechSynthesis` y el aviso, la Notification API del navegador.
+
+### Detalles
+
+- **Privacidad**: el vídeo se procesa en el navegador y no sale del equipo. Lo único que se
+  descarga es el modelo de MediaPipe (5,8 MB), que `npm run web:build` deja en local.
+- **Coste**: analiza 15 fotogramas por segundo por defecto, ajustable entre 5 y 30. La postura
+  cambia despacio, así que bajarlo apenas se nota.
+- **En segundo plano**: si minimizas la ventana, el navegador ralentiza el análisis a ~1 fps,
+  pero el sonido y la notificación siguen saltando.
+- Los auriculares se marcan a mano: el navegador no expone la ruta de audio.
+
 
 ## Ajustes
 
@@ -88,7 +137,7 @@ sonidos y los iconos que se versionan en `assets/`:
 ## Estructura
 
 ```
-App.tsx                      pantalla principal
+App.tsx                      pantalla principal (móvil)
 src/core/postureEngine.ts    máquina de estados pura de la alerta (con tests)
 src/core/orientation.ts      trigonometría del acelerómetro (con tests)
 src/core/settings.ts         ajustes persistidos en AsyncStorage
@@ -97,11 +146,14 @@ src/hooks/usePostureMonitor  une sensor + máquina de estados + avisos
 src/ui/                      componentes de interfaz
 modules/headphones/          módulo nativo de detección de auriculares (Kotlin + Swift)
 scripts/generate-assets.mjs  generador de sonidos e iconos
+web/                         versión para portátil: webcam + MediaPipe Pose
+web/src/postureVision.ts     medición de postura por webcam (con tests)
+web/build.mjs                empaquetado con esbuild
 ```
 
-La lógica de la secuencia vive en una función pura (`step()`), así que las 20 pruebas la
-recorren entera —pitido, cuenta atrás, alarma, recuperación, histéresis y cortes de
-seguridad— sin sensores ni sonido.
+La lógica de la secuencia vive en una función pura (`step()`), compartida por las dos
+versiones, así que las 32 pruebas la recorren entera —pitido, cuenta atrás, alarma,
+recuperación, histéresis y cortes de seguridad— sin sensores, cámara ni sonido.
 
 ## Limitaciones
 
@@ -110,5 +162,7 @@ seguridad— sin sensores ni sonido.
 - La detección asume que el teléfono se mueve con el torso: bolsillo del pecho, del pantalón
   o sujeto al cinturón. Sobre la mesa no mide nada útil.
 - Si cambias el móvil de sitio o de bolsillo, vuelve a calibrar.
+- En la versión de webcam hay que estar encuadrado y con algo de luz; con la tapa cerrada o
+  la cámara tapada no hay medición posible.
 - El tono EAS es una reproducción local de las dos frecuencias de la señal de atención; la
   app no emite ni retransmite avisos de emergencia reales.

@@ -10,7 +10,9 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "assets": "node scripts/generate-assets.mjs"
+    "assets": "node scripts/generate-assets.mjs",
+    "web:build": "node web/build.mjs",
+    "web:dev": "node web/build.mjs --serve"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -27,8 +29,10 @@
     "react-native-safe-area-context": "~5.7.0"
   },
   "devDependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
+    "esbuild": "^0.28.2",
     "jest": "^30.5.1",
     "jest-expo": "~57.0.5",
     "typescript": "~6.0.3"
