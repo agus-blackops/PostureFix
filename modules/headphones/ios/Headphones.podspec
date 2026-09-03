@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name           = 'Headphones'
-  s.version        = '1.0.0'
+  s.version        = '1.0.1'
   s.summary        = 'Headphone route detection for PostureFix'
   s.description    = 'Reports whether audio is currently routed to headphones.'
   s.author         = ''

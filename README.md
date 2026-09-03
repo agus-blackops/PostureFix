@@ -134,9 +134,9 @@ pestaña *Actions* del repositorio → la ejecución más reciente → sección 
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-portable-1.0.0.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-1.0.0.exe` | Windows con instalador y acceso directo |
-| `PostureFix-1.0.0.AppImage` | Linux |
+| `PostureFix-portable-1.0.1.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-1.0.1.exe` | Windows con instalador y acceso directo |
+| `PostureFix-1.0.1.AppImage` | Linux |
 
 ### Construirla uno mismo
 
@@ -192,6 +192,11 @@ sonidos y los iconos que se versionan en `assets/`:
   enteras, así que el bucle no chasquea).
 - `alarm.wav` — sirena de dos tonos para el altavoz.
 - Iconos de app, adaptativos de Android y favicon.
+
+## Versiones
+
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.0.1**, la
+que va a la feria.
 
 ## Panel para la feria
 

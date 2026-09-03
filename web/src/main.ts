@@ -41,6 +41,9 @@ import {
   type WebSettings,
 } from './settings';
 
+/** La inyecta esbuild desde el package.json al construir. */
+declare const __VERSION__: string;
+
 const SMOOTHING_TAU_MS = 400;
 /**
  * Cuánto vale la última postura vista. El bucle corre más rápido que la cámara,
@@ -606,6 +609,9 @@ function bindInputs(): void {
 }
 
 function main(): void {
+  const marca = document.getElementById('version');
+  if (marca) marca.textContent = `v${__VERSION__}`;
+
   settings = loadSettings();
   history = loadHistory();
   alerts = new WebAlerts();

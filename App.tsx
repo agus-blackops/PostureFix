@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -119,7 +120,7 @@ export default function App() {
           <ResultsCard history={history} />
 
           <Text style={styles.footer}>
-            Con auriculares suena el tono de emergencia EAS (853 + 960 Hz); por altavoz, una sirena de dos
+            PostureFix {Constants.expoConfig?.version ?? ''} · Con auriculares suena el tono de emergencia EAS (853 + 960 Hz); por altavoz, una sirena de dos
             tonos. La vigilancia necesita la app en primer plano: el sistema apaga el acelerómetro al
             bloquear el móvil.
           </Text>

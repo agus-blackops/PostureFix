@@ -28,6 +28,7 @@
       header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
       h1 { font-size: 28px; margin: 0; letter-spacing: -0.5px; }
       .tagline { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+      .version { font-variant-numeric: tabular-nums; opacity: 0.75; }
       .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
       @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
       .card {
@@ -133,7 +134,10 @@
       <header>
         <div>
           <h1>PostureFix</h1>
-          <p class="tagline">Versión para portátil: la webcam te vigila la espalda.</p>
+          <p class="tagline">
+            Versión para portátil: la webcam te vigila la espalda.
+            <span id="version" class="version"></span>
+          </p>
         </div>
       </header>
 

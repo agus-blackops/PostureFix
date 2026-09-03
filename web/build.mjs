@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const { version } = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
 const DIST = join(ROOT, 'web', 'dist');
 const MODEL_NAME = 'pose_landmarker_lite.task';
 const MODEL_URL = `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/${MODEL_NAME}`;
@@ -65,6 +66,8 @@ const options = {
   bundle: true,
   format: 'iife',
   target: ['chrome110', 'firefox110', 'safari16'],
+  // La versión sale del package.json, para que no haya dos sitios que actualizar.
+  define: { __VERSION__: JSON.stringify(version) },
   sourcemap: true,
   minify: !serve,
   logLevel: 'info',
