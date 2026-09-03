@@ -49,7 +49,8 @@
     "productName": "PostureFix",
     "copyright": "PostureFix",
     "extraMetadata": {
-      "main": "desktop/main.js"
+      "main": "desktop/main.js",
+      "dependencies": {}
     },
     "directories": {
       "output": "release",
@@ -59,7 +60,8 @@
       "desktop/**/*",
       "web/dist/**/*",
       "assets/icon.png",
-      "package.json"
+      "package.json",
+      "!node_modules/**/*"
     ],
     "win": {
       "icon": "assets/icon.ico",
