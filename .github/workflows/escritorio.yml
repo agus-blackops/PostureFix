@@ -90,12 +90,21 @@ jobs:
           "
           cat notas.md
 
-      - name: Crear el Release con los ejecutables
+      - name: Publicar el Release con los ejecutables
         env:
           GH_TOKEN: ${{ github.token }}
+          ETIQUETA: ${{ github.ref_name }}
+        # La etiqueta puede llegar de dos formas: empujada con git (aquí no
+        # existe todavía ningún Release) o creada desde el formulario de
+        # GitHub (que ya lo ha creado). Se cubren las dos.
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "PostureFix ${{ github.ref_name }}" \
-            --notes-file notas.md \
-            artefactos/posturefix-windows/*.exe \
-            artefactos/posturefix-linux/*.AppImage
+          ARCHIVOS=(artefactos/posturefix-windows/*.exe artefactos/posturefix-linux/*.AppImage)
+          if gh release view "$ETIQUETA" >/dev/null 2>&1; then
+            gh release edit "$ETIQUETA" --title "PostureFix $ETIQUETA" --notes-file notas.md
+            gh release upload "$ETIQUETA" "${ARCHIVOS[@]}" --clobber
+          else
+            gh release create "$ETIQUETA" \
+              --title "PostureFix $ETIQUETA" \
+              --notes-file notas.md \
+              "${ARCHIVOS[@]}"
+          fi
