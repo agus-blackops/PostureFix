@@ -21,7 +21,15 @@ import {
   type EngineConfig,
   type EngineState,
 } from '../core/postureEngine';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from '../core/settings';
+import { addSession, type SessionRecord } from '../core/sessionLog';
+import {
+  DEFAULT_SETTINGS,
+  loadHistory,
+  loadSettings,
+  saveHistory,
+  saveSettings,
+  type Settings,
+} from '../core/settings';
 import { AlertAudio } from '../services/audio';
 import { fireHaptic, stopVibration } from '../services/haptics';
 import { prepareNotifications, sendPostureAlert } from '../services/notifications';
@@ -42,6 +50,9 @@ export type CalibrationState = 'none' | 'calibrating' | 'done';
 export interface PostureMonitor {
   engine: EngineState;
   settings: Settings;
+  /** Sesiones guardadas, de la más reciente a la más antigua. */
+  history: SessionRecord[];
+  clearHistory: () => void;
   running: boolean;
   sensorAvailable: boolean | null;
   calibration: CalibrationState;
@@ -64,6 +75,7 @@ export function usePostureMonitor(): PostureMonitor {
   const [running, setRunning] = useState(false);
   const [sensorAvailable, setSensorAvailable] = useState<boolean | null>(null);
   const [calibration, setCalibration] = useState<CalibrationState>('none');
+  const [history, setHistory] = useState<SessionRecord[]>([]);
 
   const headphones = useHeadphones(settings.manualHeadphones);
 
@@ -74,10 +86,14 @@ export function usePostureMonitor(): PostureMonitor {
   const smoothedRef = useRef<Vector3 | null>(null);
   const lastSampleAtRef = useRef<number | null>(null);
   const calibrationSamplesRef = useRef<Vector3[] | null>(null);
+  const historyRef = useRef<SessionRecord[]>(history);
+  /** Inicio de la sesión en curso, para guardarla al parar. */
+  const sessionStartedAtRef = useRef(0);
 
   engineRef.current = engine;
   settingsRef.current = settings;
   headphonesRef.current = headphones;
+  historyRef.current = history;
 
   const config: EngineConfig = useMemo(
     () => ({
@@ -105,9 +121,10 @@ export function usePostureMonitor(): PostureMonitor {
     audioRef.current = audio;
 
     (async () => {
-      const stored = await loadSettings();
+      const [stored, storedHistory] = await Promise.all([loadSettings(), loadHistory()]);
       if (cancelled) return;
       setSettings(stored);
+      setHistory(storedHistory);
       setCalibration(stored.baseline ? 'done' : 'none');
       await audio.prepare();
       audio.setVolume(stored.volume);
@@ -137,6 +154,11 @@ export function usePostureMonitor(): PostureMonitor {
     async (action: EngineAction) => {
       const current = settingsRef.current;
       const audio = audioRef.current;
+      // En una sesión de control se registra todo pero no se avisa de nada: es
+      // el grupo con el que después se compara.
+      if (current.controlMode && action.type !== 'silence') {
+        return;
+      }
       switch (action.type) {
         case 'beep':
           await audio?.playBeep(current.volume);
@@ -274,6 +296,37 @@ export function usePostureMonitor(): PostureMonitor {
     speak('Postura guardada.', settingsRef.current.voiceEnabled);
   }, [persist, running]);
 
+  /** Guarda la sesión que acaba de terminar (si duró lo suficiente). */
+  const recordSession = useCallback(() => {
+    if (sessionStartedAtRef.current === 0) return;
+    const engineState = engineRef.current;
+    const record: SessionRecord = {
+      startedAt: sessionStartedAtRef.current,
+      durationMs: engineState.sessionMs,
+      badMs: engineState.sessionBadMs,
+      alerts: engineState.totalAlerts,
+      source: 'movil',
+      alertsEnabled: !settingsRef.current.controlMode,
+    };
+    sessionStartedAtRef.current = 0;
+
+    const updated = addSession(historyRef.current, record);
+    if (updated !== historyRef.current) {
+      historyRef.current = updated;
+      setHistory(updated);
+      void saveHistory(updated);
+    }
+    // Contadores a cero para que la próxima sesión empiece limpia.
+    engineRef.current = { ...createInitialState(), deviationDeg: engineState.deviationDeg };
+    setEngine(engineRef.current);
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    historyRef.current = [];
+    setHistory([]);
+    void saveHistory([]);
+  }, []);
+
   const start = useCallback(async () => {
     if (!settingsRef.current.baseline) {
       await calibrate();
@@ -287,6 +340,7 @@ export function usePostureMonitor(): PostureMonitor {
     }
     engineRef.current = startMonitoring(engineRef.current);
     setEngine(engineRef.current);
+    sessionStartedAtRef.current = Date.now();
     setRunning(true);
   }, [calibrate]);
 
@@ -299,7 +353,8 @@ export function usePostureMonitor(): PostureMonitor {
       void runAction(action);
     });
     silence();
-  }, [runAction, silence]);
+    recordSession();
+  }, [recordSession, runAction, silence]);
 
   /** Prueba la secuencia completa sin tener que agacharse. */
   const previewAlarm = useCallback(async () => {
@@ -323,6 +378,8 @@ export function usePostureMonitor(): PostureMonitor {
   return {
     engine,
     settings,
+    history,
+    clearHistory,
     running,
     sensorAvailable,
     calibration,

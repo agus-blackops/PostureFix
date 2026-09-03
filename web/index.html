@@ -75,6 +75,45 @@
       .setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
       .setting output { color: var(--muted); font-size: 13px; min-width: 56px; text-align: right; }
       footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+      .control-mode {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        margin-top: 14px;
+        padding: 12px;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .control-mode small { display: block; color: var(--muted); font-weight: 400; }
+      .control-mode input { width: 20px; height: 20px; accent-color: var(--accent); }
+      .hint { color: var(--muted); font-size: 13px; }
+      .comparativa-fila { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+      .comparativa-fila .etiqueta { width: 160px; font-size: 13px; color: var(--muted); }
+      .comparativa-fila .barra { flex: 1; height: 22px; background: var(--surface-alt); border-radius: 6px; overflow: hidden; }
+      .comparativa-fila .barra i { display: block; height: 100%; width: 0; background: var(--muted); transition: width 200ms; }
+      #barra-control i, #barra-control { background: var(--warn, #ffc24b); }
+      #barra-avisos { background: var(--good); }
+      .comparativa-fila output { width: 92px; text-align: right; font-weight: 700; }
+      #conclusion { font-size: 14px; margin: 4px 0 0; }
+      /* Cada sesión es una columna de altura completa; dentro, la barra crece
+         desde abajo. El contenedor necesita altura definida o los porcentajes
+         de las barras no resuelven contra nada. */
+      .sesiones { display: flex; align-items: stretch; gap: 4px; height: 90px; margin-top: 16px; }
+      .sesiones .sesion {
+        flex: 1;
+        max-width: 26px;
+        background: var(--surface-alt);
+        border-radius: 4px 4px 0 0;
+        display: flex;
+        align-items: flex-end;
+      }
+      .sesiones .sesion i { display: block; width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
+      .leyenda { display: flex; gap: 16px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+      .leyenda span { display: flex; align-items: center; gap: 6px; }
+      .leyenda b { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+      .sesiones .sesion.control i { background: #ffc24b; }
+      .sesiones .sesion.avisos i { background: var(--good); }
       .alert {
         position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 16px; text-align: center; padding: 32px; color: #fff; z-index: 10; pointer-events: none;
@@ -118,6 +157,14 @@
             <div class="track" id="grace-track"><div id="grace"></div></div>
           </div>
 
+          <label class="control-mode" for="set-control">
+            <input type="checkbox" id="set-control" />
+            <span>
+              <b>Sesión de control</b>
+              <small>Mide y registra sin avisar. Es el grupo de comparación del experimento.</small>
+            </span>
+          </label>
+
           <div class="buttons">
             <button id="start">Empezar a vigilar</button>
             <div class="row">
@@ -133,6 +180,40 @@
           </div>
         </section>
       </div>
+
+      <section class="card" id="historial" style="margin-top: 16px">
+        <h2 style="margin-top: 0">Historial y resultados</h2>
+        <p id="historial-vacio" class="hint">
+          Aún no hay sesiones guardadas. Haz una <b>sesión de control</b> y otra normal de al menos
+          medio minuto cada una, y aquí aparecerá la comparación.
+        </p>
+
+        <div id="comparativa" hidden>
+          <div class="comparativa-fila">
+            <span class="etiqueta">Sin avisos (control)</span>
+            <span class="barra"><i id="barra-control"></i></span>
+            <output id="valor-control"></output>
+          </div>
+          <div class="comparativa-fila">
+            <span class="etiqueta">Con avisos</span>
+            <span class="barra"><i id="barra-avisos"></i></span>
+            <output id="valor-avisos"></output>
+          </div>
+          <p id="conclusion"></p>
+        </div>
+
+        <div id="sesiones" class="sesiones"></div>
+        <div class="leyenda" id="leyenda" hidden>
+          <span><b style="background: #ffc24b"></b> control (sin avisos)</span>
+          <span><b style="background: #2ed47a"></b> con avisos</span>
+          <span>altura = % del tiempo encorvado</span>
+        </div>
+
+        <div class="row" style="margin-top: 12px">
+          <button id="csv">Descargar CSV</button>
+          <button id="borrar">Borrar historial</button>
+        </div>
+      </section>
 
       <section class="card" style="margin-top: 16px">
         <h2 style="margin-top: 0">Sensibilidad</h2>

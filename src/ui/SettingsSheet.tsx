@@ -7,7 +7,10 @@ interface Props {
   visible: boolean;
   settings: Settings;
   detectionAvailable: boolean;
+  /** Sesiones guardadas, para poder ofrecer borrarlas. */
+  sessionCount: number;
   onChange: (patch: Partial<Settings>) => void;
+  onClearHistory: () => void;
   onClose: () => void;
 }
 
@@ -67,7 +70,15 @@ function Toggle({
 }
 
 /** Panel de ajustes: sensibilidad, sonidos y avisos. */
-export function SettingsSheet({ visible, settings, detectionAvailable, onChange, onClose }: Props) {
+export function SettingsSheet({
+  visible,
+  settings,
+  detectionAvailable,
+  sessionCount,
+  onChange,
+  onClearHistory,
+  onClose,
+}: Props) {
   const bump = (key: 'thresholdDeg' | 'graceSeconds' | 'volume', direction: 1 | -1) => {
     const limits = LIMITS[key];
     onChange({ [key]: clamp(settings[key] + direction * limits.step, limits.min, limits.max) });
@@ -152,6 +163,19 @@ export function SettingsSheet({ visible, settings, detectionAvailable, onChange,
               value={settings.keepAwake}
               onValueChange={(keepAwake) => onChange({ keepAwake })}
             />
+
+            <Text style={styles.section}>Experimento</Text>
+            <Toggle
+              label="Sesión de control"
+              hint="Mide y registra sin avisar. Es el grupo con el que comparar."
+              value={settings.controlMode}
+              onValueChange={(controlMode) => onChange({ controlMode })}
+            />
+            {sessionCount > 0 ? (
+              <Pressable onPress={onClearHistory} style={styles.danger}>
+                <Text style={styles.dangerText}>Borrar las {sessionCount} sesiones guardadas</Text>
+              </Pressable>
+            ) : null}
           </ScrollView>
         </View>
       </View>
@@ -212,4 +236,13 @@ const styles = StyleSheet.create({
   },
   stepText: { color: colors.text, fontSize: 22, fontWeight: '700', lineHeight: 24 },
   stepValue: { color: colors.text, fontSize: 15, fontWeight: '700', minWidth: 54, textAlign: 'center' },
+  danger: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  dangerText: { color: colors.danger, fontSize: 14, fontWeight: '700' },
 });

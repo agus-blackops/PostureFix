@@ -91,6 +91,10 @@ dependen de tu estatura ni de la distancia a la pantalla):
 | `slide` | Los hombros bajan en el encuadre: te escurres en la silla |
 | `tilt` | La línea de los hombros se inclina: te ladeas |
 
+Cuando la cámara ve a varias personas se mide a la de **hombros más anchos**, que es siempre
+la más cercana: así, en un sitio con gente alrededor, la app no se pone a medir a quien pasa
+por detrás.
+
 Se toma el peor de los cuatro (no la suma) y se traduce a "grados equivalentes", de modo que
 la máquina de estados y el umbral son exactamente los mismos que en el móvil. La interfaz dice
 cuál de los cuatro está mandando.
@@ -149,6 +153,24 @@ Windows y el AppImage desde Linux. Por eso el workflow los construye en los runn
 > empaquetar. Para trabajar sólo con la app de móvil se pueden omitir.
 
 
+## Medir si funciona (el experimento)
+
+PostureFix no solo avisa: también **mide**, para poder responder a la pregunta con datos en
+lugar de con opiniones.
+
+1. Activa **Sesión de control**: la app mide y registra igual, pero no pita, no habla, no
+   vibra y no enseña la pantalla roja. Es el grupo de comparación.
+2. Haz otra sesión con los avisos puestos, de duración parecida.
+3. En **Historial y resultados** aparece el porcentaje de tiempo encorvado de cada grupo y
+   cuánto baja gracias a los avisos.
+
+Las sesiones de menos de medio minuto no se guardan, porque no dicen nada. La versión de
+portátil exporta el historial a **CSV** para llevarlo a una hoja de cálculo o a un póster.
+
+La comparación vive en `src/core/sessionLog.ts`, es pura y está cubierta por tests: cuando
+falta alguno de los dos grupos no inventa una conclusión, lo dice.
+
+
 ## Ajustes
 
 Desde el engranaje de la pantalla principal:
@@ -178,6 +200,7 @@ App.tsx                      pantalla principal (móvil)
 src/core/postureEngine.ts    máquina de estados pura de la alerta (con tests)
 src/core/orientation.ts      trigonometría del acelerómetro (con tests)
 src/core/settings.ts         ajustes persistidos en AsyncStorage
+src/core/sessionLog.ts       historial de sesiones y comparación (con tests)
 src/services/               audio, voz, vibración y notificaciones
 src/hooks/usePostureMonitor  une sensor + máquina de estados + avisos
 src/ui/                      componentes de interfaz
@@ -191,7 +214,7 @@ desktop/main.js              envoltorio de escritorio (Electron)
 ```
 
 La lógica de la secuencia vive en una función pura (`step()`), compartida por las dos
-versiones, así que las 32 pruebas la recorren entera —pitido, cuenta atrás, alarma,
+versiones, así que las 45 pruebas la recorren entera —pitido, cuenta atrás, alarma,
 recuperación, histéresis y cortes de seguridad— sin sensores, cámara ni sonido.
 
 ## Limitaciones

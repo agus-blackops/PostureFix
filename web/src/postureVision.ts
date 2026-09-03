@@ -99,6 +99,31 @@ export function extractMetrics(landmarks: Landmark[] | null | undefined): Postur
   };
 }
 
+/**
+ * Elige a quién medir cuando la cámara ve a varias personas: se queda con la de
+ * hombros más anchos, que es siempre la más cercana a la cámara. Sin esto, en
+ * un sitio con gente pasando por detrás la app podría ponerse a medir la
+ * postura de un curioso en lugar de la de quien está sentado delante.
+ *
+ * @returns los puntos y las medidas de la persona elegida, o `null` si no hay
+ *          ninguna suficientemente visible.
+ */
+export function selectSubject(
+  poses: (Landmark[] | null | undefined)[] | null | undefined
+): { landmarks: Landmark[]; metrics: PostureMetrics } | null {
+  if (!poses) {
+    return null;
+  }
+  let best: { landmarks: Landmark[]; metrics: PostureMetrics } | null = null;
+  for (const landmarks of poses) {
+    const metrics = extractMetrics(landmarks);
+    if (metrics && landmarks && (!best || metrics.shoulderWidth > best.metrics.shoulderWidth)) {
+      best = { landmarks, metrics };
+    }
+  }
+  return best;
+}
+
 /** Filtro paso bajo sobre las medidas, para que el número no baile. */
 export function smoothMetrics(
   previous: PostureMetrics | null,

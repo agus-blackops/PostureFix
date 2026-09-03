@@ -8,6 +8,8 @@ interface Props {
   phase: Phase;
   /** Números ya cantados (1, 2 o 3) durante la cuenta atrás. */
   countsSpoken: number;
+  /** En una sesión de control se mide sin avisar: tampoco por pantalla. */
+  controlMode?: boolean;
 }
 
 /**
@@ -15,9 +17,9 @@ interface Props {
  * después, el aviso rojo parpadeante. La idea es que sea imposible ignorarla
  * aunque el móvil esté en silencio.
  */
-export function AlertOverlay({ phase, countsSpoken }: Props) {
+export function AlertOverlay({ phase, countsSpoken, controlMode = false }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
-  const visible = phase === 'countdown' || phase === 'alarm';
+  const visible = !controlMode && (phase === 'countdown' || phase === 'alarm');
 
   useEffect(() => {
     if (!visible) {

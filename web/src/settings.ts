@@ -1,6 +1,8 @@
+import { sanitizeHistory, type SessionRecord } from '../../src/core/sessionLog';
 import type { PostureMetrics } from './postureVision';
 
 const STORAGE_KEY = 'posturefix.web.v1';
+const HISTORY_KEY = 'posturefix.web.history.v1';
 
 export interface WebSettings {
   /** Postura de referencia guardada al calibrar. */
@@ -16,6 +18,11 @@ export interface WebSettings {
   notificationsEnabled: boolean;
   /** Fotogramas por segundo que se analizan. La postura cambia despacio. */
   fps: number;
+  /**
+   * Sesión de control: mide y registra, pero no avisa. Es el grupo con el que
+   * comparar para saber si los avisos sirven de algo.
+   */
+  controlMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: WebSettings = {
@@ -28,6 +35,7 @@ export const DEFAULT_SETTINGS: WebSettings = {
   voiceEnabled: true,
   notificationsEnabled: true,
   fps: 15,
+  controlMode: false,
 };
 
 export const LIMITS = {
@@ -71,5 +79,22 @@ export function saveSettings(settings: WebSettings): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
     // Modo incógnito o almacenamiento lleno: la vigilancia sigue funcionando.
+  }
+}
+
+export function loadHistory(): SessionRecord[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return sanitizeHistory(raw ? JSON.parse(raw) : []);
+  } catch {
+    return [];
+  }
+}
+
+export function saveHistory(history: SessionRecord[]): void {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Perder el historial no debe interrumpir una sesión en curso.
   }
 }

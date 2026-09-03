@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { DEFAULT_ENGINE_CONFIG } from './postureEngine';
+import { sanitizeHistory, type SessionRecord } from './sessionLog';
 import type { Vector3 } from './orientation';
 
 const STORAGE_KEY = 'posturefix.settings.v1';
+const HISTORY_KEY = 'posturefix.history.v1';
 
 export interface Settings {
   /** Vector de gravedad guardado al calibrar con la espalda recta. */
@@ -26,6 +28,11 @@ export interface Settings {
   keepAwake: boolean;
   /** Auriculares declarados a mano cuando no hay detección nativa. */
   manualHeadphones: boolean;
+  /**
+   * Sesión de control: mide y registra, pero no avisa. Es el grupo con el que
+   * comparar para saber si los avisos sirven de algo.
+   */
+  controlMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -40,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notificationsEnabled: true,
   keepAwake: true,
   manualHeadphones: false,
+  controlMode: false,
 };
 
 export const LIMITS = {
@@ -82,5 +90,22 @@ export async function saveSettings(settings: Settings): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
     // Que no se pueda guardar no debe tumbar la vigilancia en curso.
+  }
+}
+
+export async function loadHistory(): Promise<SessionRecord[]> {
+  try {
+    const raw = await AsyncStorage.getItem(HISTORY_KEY);
+    return sanitizeHistory(raw ? JSON.parse(raw) : []);
+  } catch {
+    return [];
+  }
+}
+
+export async function saveHistory(history: SessionRecord[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Perder el historial no debe interrumpir una sesión en curso.
   }
 }

@@ -4,6 +4,7 @@ import {
   POSE,
   deviationFrom,
   extractMetrics,
+  selectSubject,
   smoothMetrics,
   type Landmark,
 } from '../postureVision';
@@ -104,6 +105,28 @@ describe('postureVision', () => {
     const base = upright();
     const straighter = extractMetrics(skeleton({ earY: 0.2, shoulderY: 0.55, halfWidth: 0.09 }))!;
     expect(deviationFrom(base, straighter).deg).toBe(0);
+  });
+
+  describe('selectSubject: a quién medir cuando hay varias personas', () => {
+    it('se queda con la persona más cercana a la cámara', () => {
+      const cerca = skeleton({ halfWidth: 0.18 });
+      const lejos = skeleton({ halfWidth: 0.07 });
+      const elegido = selectSubject([lejos, cerca, lejos]);
+      expect(elegido?.metrics.shoulderWidth).toBeCloseTo(0.36, 5);
+      expect(elegido?.landmarks).toBe(cerca);
+    });
+
+    it('ignora a quien no se ve bien aunque esté más cerca', () => {
+      const tapado = skeleton({ halfWidth: 0.25, visibility: 0.1 });
+      const visible = skeleton({ halfWidth: 0.1 });
+      expect(selectSubject([tapado, visible])?.landmarks).toBe(visible);
+    });
+
+    it('no devuelve nada si no hay nadie medible', () => {
+      expect(selectSubject(null)).toBeNull();
+      expect(selectSubject([])).toBeNull();
+      expect(selectSubject([skeleton({ visibility: 0 }), null])).toBeNull();
+    });
   });
 
   it('el filtro arranca en la primera muestra y converge', () => {

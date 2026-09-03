@@ -6,6 +6,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { usePostureMonitor } from './src/hooks/usePostureMonitor';
 import { AlertOverlay } from './src/ui/AlertOverlay';
 import { PostureGauge } from './src/ui/PostureGauge';
+import { ResultsCard } from './src/ui/ResultsCard';
 import { SettingsSheet } from './src/ui/SettingsSheet';
 import { StatusChip } from './src/ui/StatusChip';
 import { colors, radius, spacing } from './src/ui/theme';
@@ -21,7 +22,7 @@ export default function App() {
   const monitor = usePostureMonitor();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
-  const { engine, settings, running, calibration, headphones, alarmSound, sensorAvailable } = monitor;
+  const { engine, settings, history, running, calibration, headphones, alarmSound, sensorAvailable } = monitor;
   const calibrated = settings.baseline != null;
   const graceProgress = engine.badMs / Math.max(1, settings.graceSeconds * 1000);
 
@@ -53,6 +54,7 @@ export default function App() {
               tone={headphones.connected ? 'good' : 'neutral'}
             />
             <StatusChip label={alarmSound === 'eas' ? 'Alarma EAS' : 'Sirena'} tone="warn" />
+            {settings.controlMode ? <StatusChip label="Sesión de control" tone="warn" /> : null}
             {sensorAvailable === false ? <StatusChip label="Sin acelerómetro" tone="danger" /> : null}
           </View>
 
@@ -72,6 +74,7 @@ export default function App() {
             thresholdDeg={settings.thresholdDeg}
             phase={engine.phase}
             graceProgress={graceProgress}
+            controlMode={settings.controlMode}
           />
 
           <Pressable
@@ -113,6 +116,8 @@ export default function App() {
             </View>
           </View>
 
+          <ResultsCard history={history} />
+
           <Text style={styles.footer}>
             Con auriculares suena el tono de emergencia EAS (853 + 960 Hz); por altavoz, una sirena de dos
             tonos. La vigilancia necesita la app en primer plano: el sistema apaga el acelerómetro al
@@ -120,13 +125,19 @@ export default function App() {
           </Text>
         </ScrollView>
 
-        <AlertOverlay phase={engine.phase} countsSpoken={engine.countsSpoken} />
+        <AlertOverlay
+          phase={engine.phase}
+          countsSpoken={engine.countsSpoken}
+          controlMode={settings.controlMode}
+        />
 
         <SettingsSheet
           visible={settingsVisible}
           settings={settings}
           detectionAvailable={headphones.detectionAvailable}
+          sessionCount={history.length}
           onChange={monitor.updateSettings}
+          onClearHistory={monitor.clearHistory}
           onClose={() => setSettingsVisible(false)}
         />
       </SafeAreaView>

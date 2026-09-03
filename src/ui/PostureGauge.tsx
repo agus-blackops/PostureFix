@@ -9,6 +9,8 @@ interface Props {
   phase: Phase;
   /** 0-1: cuánto queda para que salte el pitido. */
   graceProgress: number;
+  /** En una sesión de control se registra la mala postura sin anunciarla. */
+  controlMode?: boolean;
 }
 
 const MAX_ANGLE = 70;
@@ -27,8 +29,10 @@ const PHASE_LABEL: Record<Phase, string> = {
  * Indicador principal: el ángulo respecto a la postura calibrada, una barra con
  * el umbral marcado y el progreso del margen antes del pitido.
  */
-export function PostureGauge({ deviationDeg, thresholdDeg, phase, graceProgress }: Props) {
-  const color = phaseColors[phase] ?? colors.textMuted;
+export function PostureGauge({ deviationDeg, thresholdDeg, phase, graceProgress, controlMode = false }: Props) {
+  const alerting = phase === 'scare' || phase === 'countdown' || phase === 'alarm';
+  // En control no conviene ni el rótulo rojo: el usuario lo leería como aviso.
+  const color = controlMode && alerting ? colors.warn : (phaseColors[phase] ?? colors.textMuted);
   const fill = Math.min(1, deviationDeg / MAX_ANGLE);
   const thresholdMark = Math.min(1, thresholdDeg / MAX_ANGLE);
 
@@ -39,7 +43,9 @@ export function PostureGauge({ deviationDeg, thresholdDeg, phase, graceProgress 
         <Text style={styles.caption}>inclinación</Text>
       </View>
 
-      <Text style={[styles.phase, { color }]}>{PHASE_LABEL[phase]}</Text>
+      <Text style={[styles.phase, { color }]}>
+        {controlMode && alerting ? 'Mala postura registrada (sin avisar)' : PHASE_LABEL[phase]}
+      </Text>
 
       <View style={styles.barTrack}>
         <View style={[styles.barFill, { width: `${fill * 100}%`, backgroundColor: color }]} />

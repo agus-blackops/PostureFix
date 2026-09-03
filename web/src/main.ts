@@ -4,6 +4,7 @@ import {
   DEFAULT_ENGINE_CONFIG,
   MESSAGES,
   createInitialState,
+  isAlerting,
   startMonitoring,
   step,
   stopMonitoring,
@@ -19,13 +20,26 @@ import {
   CAUSE_LABEL,
   POSE,
   deviationFrom,
-  extractMetrics,
+  selectSubject,
   smoothMetrics,
   type Landmark,
   type PostureCause,
   type PostureMetrics,
 } from './postureVision';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type WebSettings } from './settings';
+import {
+  addSession,
+  compareModes,
+  toCsv,
+  type SessionRecord,
+} from '../../src/core/sessionLog';
+import {
+  DEFAULT_SETTINGS,
+  loadHistory,
+  loadSettings,
+  saveHistory,
+  saveSettings,
+  type WebSettings,
+} from './settings';
 
 const SMOOTHING_TAU_MS = 400;
 /**
@@ -75,7 +89,19 @@ const ui = {
   alerts: el('stat-alerts'),
   badTime: el('stat-bad'),
   sessionTime: el('stat-session'),
+  historyEmpty: el('historial-vacio'),
+  comparison: el('comparativa'),
+  barControl: el('barra-control'),
+  barAlerts: el('barra-avisos'),
+  valueControl: el('valor-control'),
+  valueAlerts: el('valor-avisos'),
+  conclusion: el('conclusion'),
+  sessions: el('sesiones'),
+  legend: el('leyenda'),
+  csv: el<HTMLButtonElement>('csv'),
+  clearHistory: el<HTMLButtonElement>('borrar'),
   inputs: {
+    controlMode: el<HTMLInputElement>('set-control'),
     thresholdDeg: el<HTMLInputElement>('set-threshold'),
     graceSeconds: el<HTMLInputElement>('set-grace'),
     volume: el<HTMLInputElement>('set-volume'),
@@ -104,6 +130,9 @@ let lastFrameAt: number | null = null;
 let lastVideoTime = -1;
 let calibrationSamples: PostureMetrics[] | null = null;
 let cause: PostureCause = 'none';
+let history: SessionRecord[] = [];
+/** Inicio de la sesión en curso, para guardarla al parar. */
+let sessionStartedAt = 0;
 /** El análisis es síncrono: sin esto los avisos del temporizador se apilan. */
 let busy = false;
 /** Momento de la última detección válida (`performance.now()`). */
@@ -137,6 +166,11 @@ function formatDuration(ms: number): string {
 // --------------------------------------------------------------- acciones ---
 
 function runAction(action: EngineAction): void {
+  // En una sesión de control se cuenta todo pero no se avisa de nada: es el
+  // grupo con el que después se compara.
+  if (settings.controlMode && action.type !== 'silence') {
+    return;
+  }
   switch (action.type) {
     case 'beep':
       alerts.playBeep();
@@ -167,8 +201,8 @@ function readPose(nowMs: number): { metrics: PostureMetrics | null; landmarks: L
   }
   lastVideoTime = ui.video.currentTime;
   const result = landmarker.detectForVideo(ui.video, nowMs);
-  const landmarks = (result.landmarks?.[0] as Landmark[] | undefined) ?? null;
-  return { metrics: extractMetrics(landmarks), landmarks };
+  const subject = selectSubject(result.landmarks as Landmark[][] | undefined);
+  return { metrics: subject?.metrics ?? null, landmarks: subject?.landmarks ?? null };
 }
 
 function tick(): void {
@@ -271,34 +305,38 @@ function drawOverlay(landmarks: Landmark[] | null): void {
 function render(): void {
   const deviation = engine.deviationDeg;
   ui.angle.textContent = `${Math.round(deviation)}°`;
-  ui.phase.textContent = PHASE_LABEL[engine.phase];
+  ui.phase.textContent =
+    settings.controlMode && isAlerting(engine.phase)
+      ? 'Mala postura registrada (sin avisar)'
+      : PHASE_LABEL[engine.phase];
   ui.cause.textContent = !settings.baseline
     ? 'Sin calibrar'
     : !visible
       ? 'No te veo: colócate frente a la cámara'
       : engine.phase === 'idle'
         ? 'Listo para vigilar'
-        : CAUSE_LABEL[deviation >= settings.thresholdDeg ? cause : 'none'];
+        : (settings.controlMode ? 'Sesión de control · ' : '') +
+          CAUSE_LABEL[deviation >= settings.thresholdDeg ? cause : 'none'];
 
   const color =
-    engine.phase === 'alarm'
+    engine.phase === 'alarm' && !settings.controlMode
       ? '#FF3B30'
       : engine.phase === 'ok' || engine.phase === 'cooldown' || engine.phase === 'idle'
         ? '#2ED47A'
         : '#FFC24B';
-  ui.bar.style.width = `${Math.min(100, (deviation / MAX_ANGLE) * 100)}%`;
+  ui.bar.style.width = cssPercent(deviation / MAX_ANGLE);
   ui.bar.style.background = color;
   ui.angle.style.color = color;
   ui.phase.style.color = color;
-  ui.threshold.style.left = `${Math.min(100, (settings.thresholdDeg / MAX_ANGLE) * 100)}%`;
-  ui.grace.style.width = `${Math.min(100, (engine.badMs / (settings.graceSeconds * 1000)) * 100)}%`;
+  ui.threshold.style.left = cssPercent(settings.thresholdDeg / MAX_ANGLE);
+  ui.grace.style.width = cssPercent(engine.badMs / (settings.graceSeconds * 1000));
 
   ui.alerts.textContent = String(engine.totalAlerts);
   ui.badTime.textContent = formatDuration(engine.sessionBadMs);
   ui.sessionTime.textContent = formatDuration(engine.sessionMs);
 
-  const showCountdown = engine.phase === 'countdown';
-  const showAlarm = engine.phase === 'alarm';
+  const showCountdown = engine.phase === 'countdown' && !settings.controlMode;
+  const showAlarm = engine.phase === 'alarm' && !settings.controlMode;
   ui.alertOverlay.className = showAlarm ? 'alert alarm' : showCountdown ? 'alert countdown' : 'alert hidden';
   if (showCountdown) {
     ui.alertText.textContent = String(Math.max(1, engine.countsSpoken));
@@ -307,6 +345,90 @@ function render(): void {
     ui.alertText.textContent = '¡ENDERÉZATE!';
     ui.alertBody.textContent = MESSAGES.notificationBody;
   }
+}
+
+// ------------------------------------------------------------ historial ---
+
+/** Guarda la sesión que acaba de terminar (si duró lo suficiente). */
+function recordSession(): void {
+  if (sessionStartedAt === 0) return;
+  const record: SessionRecord = {
+    startedAt: sessionStartedAt,
+    durationMs: engine.sessionMs,
+    badMs: engine.sessionBadMs,
+    alerts: engine.totalAlerts,
+    source: 'webcam',
+    alertsEnabled: !settings.controlMode,
+  };
+  sessionStartedAt = 0;
+  const updated = addSession(history, record);
+  if (updated !== history) {
+    history = updated;
+    saveHistory(history);
+  }
+  // Los contadores se reinician para que la próxima sesión empiece limpia.
+  engine = { ...createInitialState(), deviationDeg: engine.deviationDeg };
+  renderHistory();
+}
+
+/** Para leer: con espacio antes del %, como manda la tipografía en español. */
+const percent = (ratio: number) => `${(ratio * 100).toFixed(1)} %`;
+/** Para CSS: sin espacio, o el navegador descarta la declaración entera. */
+const cssPercent = (ratio: number) => `${Math.min(100, Math.max(0, ratio * 100)).toFixed(1)}%`;
+
+function renderHistory(): void {
+  const hasHistory = history.length > 0;
+  ui.historyEmpty.hidden = hasHistory;
+  ui.comparison.hidden = !hasHistory;
+  ui.legend.hidden = !hasHistory;
+  if (!hasHistory) {
+    ui.sessions.replaceChildren();
+    return;
+  }
+
+  const { control, withAlerts, improvement } = compareModes(history);
+  ui.barControl.style.width = cssPercent(control.badRatio);
+  ui.barAlerts.style.width = cssPercent(withAlerts.badRatio);
+  ui.valueControl.textContent = control.sessions ? percent(control.badRatio) : '—';
+  ui.valueAlerts.textContent = withAlerts.sessions ? percent(withAlerts.badRatio) : '—';
+
+  ui.conclusion.textContent =
+    improvement == null
+      ? `Faltan datos para comparar: ${control.sessions} sesión(es) de control y ${withAlerts.sessions} con avisos.`
+      : improvement > 0
+        ? `Con los avisos se pasa un ${percent(improvement)} menos de tiempo encorvado.`
+        : `Con los avisos no baja el tiempo encorvado (${percent(-improvement)} más).`;
+
+  // Una barra por sesión, de la más antigua a la más reciente.
+  const recent = history.slice(0, 24).reverse();
+  ui.sessions.replaceChildren(
+    ...recent.map((record) => {
+      const ratio = record.durationMs > 0 ? record.badMs / record.durationMs : 0;
+      const bar = document.createElement('div');
+      bar.className = `sesion ${record.alertsEnabled ? 'avisos' : 'control'}`;
+      const fill = document.createElement('i');
+      fill.style.height = cssPercent(ratio);
+      bar.appendChild(fill);
+      bar.title = [
+        new Date(record.startedAt).toLocaleString(),
+        record.alertsEnabled ? 'con avisos' : 'control (sin avisos)',
+        `${(record.durationMs / 60000).toFixed(1)} min`,
+        `${percent(ratio)} encorvado`,
+        `${record.alerts} alerta(s)`,
+      ].join(' · ');
+      return bar;
+    })
+  );
+}
+
+function downloadCsv(): void {
+  const blob = new Blob([toCsv(history)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `posturefix-sesiones-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 // -------------------------------------------------------------- acciones ---
@@ -390,6 +512,7 @@ async function start(): Promise<void> {
   await alerts.requestNotifications(settings.notificationsEnabled);
   await alerts.requestWakeLock();
   engine = startMonitoring(engine);
+  sessionStartedAt = Date.now();
   running = true;
   ui.start.textContent = 'Parar vigilancia';
   ui.start.classList.add('stop');
@@ -401,6 +524,7 @@ function stop(): void {
   const result = stopMonitoring(engine);
   engine = result.state;
   result.actions.forEach(runAction);
+  recordSession();
   alerts.stopAll();
   void alerts.releaseWakeLock();
   running = false;
@@ -448,6 +572,7 @@ function syncInputs(): void {
   ui.inputs.easAlways.checked = settings.easAlways;
   ui.inputs.voiceEnabled.checked = settings.voiceEnabled;
   ui.inputs.notificationsEnabled.checked = settings.notificationsEnabled;
+  ui.inputs.controlMode.checked = settings.controlMode;
 
   ui.values.thresholdDeg.textContent = `${settings.thresholdDeg}°`;
   ui.values.graceSeconds.textContent = `${settings.graceSeconds} s`;
@@ -456,6 +581,14 @@ function syncInputs(): void {
 }
 
 function bindInputs(): void {
+  ui.inputs.controlMode.addEventListener('change', () => update({ controlMode: ui.inputs.controlMode.checked }));
+  ui.csv.addEventListener('click', downloadCsv);
+  ui.clearHistory.addEventListener('click', () => {
+    if (history.length === 0 || !confirm('¿Borrar todas las sesiones guardadas?')) return;
+    history = [];
+    saveHistory(history);
+    renderHistory();
+  });
   ui.inputs.thresholdDeg.addEventListener('input', () => update({ thresholdDeg: Number(ui.inputs.thresholdDeg.value) }));
   ui.inputs.graceSeconds.addEventListener('input', () => update({ graceSeconds: Number(ui.inputs.graceSeconds.value) }));
   ui.inputs.volume.addEventListener('input', () => update({ volume: Number(ui.inputs.volume.value) }));
@@ -474,11 +607,13 @@ function bindInputs(): void {
 
 function main(): void {
   settings = loadSettings();
+  history = loadHistory();
   alerts = new WebAlerts();
   alerts.setVolume(settings.volume);
   syncInputs();
   bindInputs();
   render();
+  renderHistory();
 
   ui.start.addEventListener('click', () => (running ? stop() : void start()));
   ui.calibrate.addEventListener('click', () => void calibrate());
@@ -491,7 +626,9 @@ function main(): void {
     }
   });
 
+  // Cerrar la ventana en mitad de una sesión no debe perder la medición.
   window.addEventListener('beforeunload', () => {
+    if (running) recordSession();
     alerts.stopAll();
     stopCamera(ui.video);
   });

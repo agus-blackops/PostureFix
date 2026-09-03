@@ -28,7 +28,9 @@ export async function createPoseLandmarker(log: (message: string) => void): Prom
   const options = (delegate: 'GPU' | 'CPU') => ({
     baseOptions: { modelAssetPath, delegate },
     runningMode: 'VIDEO' as const,
-    numPoses: 1,
+    // Se piden varias personas para poder quedarnos con la más cercana a la
+    // cámara: en un sitio con gente alrededor, la de delante es la que importa.
+    numPoses: 3,
   });
 
   try {
