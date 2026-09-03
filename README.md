@@ -129,8 +129,13 @@ cosas que el navegador no puede:
 
 ### Descargarla ya hecha
 
-Cada ejecución del workflow **App de escritorio** deja los ejecutables como artefactos:
-pestaña *Actions* del repositorio → la ejecución más reciente → sección *Artifacts*:
+Las versiones publicadas están en **[Releases](https://github.com/agus-blackops/PostureFix/releases)**,
+con los ejecutables adjuntos: no caducan y se descargan sin iniciar sesión. Se publican solas al
+etiquetar una versión (`git tag v1.0.1 && git push origin v1.0.1`).
+
+Para probar un cambio que aún no es versión, cada ejecución del workflow **App de escritorio**
+deja los mismos archivos como artefactos: pestaña *Actions* → la ejecución más reciente →
+sección *Artifacts* (caducan a los 90 días y piden sesión):
 
 | Archivo | Para qué |
 | --- | --- |
