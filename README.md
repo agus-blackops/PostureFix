@@ -193,6 +193,13 @@ sonidos y los iconos que se versionan en `assets/`:
 - `alarm.wav` — sirena de dos tonos para el altavoz.
 - Iconos de app, adaptativos de Android y favicon.
 
+## Panel para la feria
+
+`docs/panel-feria.html` es el panel explicativo del stand: la hipótesis y las variables, las dos
+formas de medir con sus diagramas, la secuencia de aviso con sus tiempos reales y cómo se
+comprueba con sesiones de control. Se abre con doble clic en cualquier navegador y está pensado
+para imprimirse (lleva sus propios estilos de impresión).
+
 ## Estructura
 
 ```
@@ -210,6 +217,7 @@ web/                         versión para portátil: webcam + MediaPipe Pose
 web/src/postureVision.ts     medición de postura por webcam (con tests)
 web/build.mjs                empaquetado con esbuild
 desktop/main.js              envoltorio de escritorio (Electron)
+docs/panel-feria.html        panel explicativo para el stand
 .github/workflows/           construcción de los ejecutables
 ```
 
