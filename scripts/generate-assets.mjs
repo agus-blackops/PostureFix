@@ -242,6 +242,27 @@ function encodePng(canvas) {
   ]);
 }
 
+/**
+ * Envuelve un PNG en un contenedor .ico, que es lo que pide Windows para el
+ * icono del ejecutable de escritorio. Desde Vista el .ico admite PNG dentro,
+ * así que basta con la cabecera de 22 bytes.
+ */
+function pngToIco(png, size) {
+  const header = Buffer.alloc(22);
+  header.writeUInt16LE(0, 0); // reservado
+  header.writeUInt16LE(1, 2); // tipo: icono
+  header.writeUInt16LE(1, 4); // una sola imagen
+  header.writeUInt8(size >= 256 ? 0 : size, 6); // 0 significa 256 px
+  header.writeUInt8(size >= 256 ? 0 : size, 7);
+  header.writeUInt8(0, 8); // paleta
+  header.writeUInt8(0, 9); // reservado
+  header.writeUInt16LE(1, 10); // planos
+  header.writeUInt16LE(32, 12); // bits por píxel
+  header.writeUInt32LE(png.length, 14);
+  header.writeUInt32LE(header.length, 18);
+  return Buffer.concat([header, png]);
+}
+
 /** Reduce con muestreo por cajas para que el favicon no quede dentado. */
 function downscale(canvas, size) {
   const out = createCanvas(size, size);
@@ -305,8 +326,14 @@ for (const [name, samples] of Object.entries(sounds)) {
   console.log(`assets/sounds/${name}  ${(bytes / 1024).toFixed(0)} KB`);
 }
 
-for (const [name, canvas] of Object.entries(buildIcons())) {
+const icons = buildIcons();
+for (const [name, canvas] of Object.entries(icons)) {
   const png = encodePng(canvas);
   writeFileSync(join(ASSETS, name), png);
   console.log(`assets/${name}  ${(png.length / 1024).toFixed(0)} KB`);
 }
+
+// Icono del ejecutable de escritorio (Windows).
+const ico = pngToIco(encodePng(downscale(icons['icon.png'], 256)), 256);
+writeFileSync(join(ASSETS, 'icon.ico'), ico);
+console.log(`assets/icon.ico  ${(ico.length / 1024).toFixed(0)} KB`);

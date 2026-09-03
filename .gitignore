@@ -42,3 +42,6 @@ yarn-error.*
 
 # Versión de escritorio (webcam)
 web/dist/
+
+# Ejecutables de escritorio
+release/

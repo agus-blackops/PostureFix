@@ -112,6 +112,43 @@ cuál de los cuatro está mandando.
 - Los auriculares se marcan a mano: el navegador no expone la ruta de audio.
 
 
+## App de escritorio (el ejecutable)
+
+La versión de webcam también se empaqueta como aplicación de escritorio, y eso resuelve dos
+cosas que el navegador no puede:
+
+- **Se abre con doble clic**, sin terminal ni `localhost`: los archivos se sirven por un
+  esquema propio `app://` que Chromium trata como contexto seguro, así que la cámara funciona.
+- **Sigue vigilando en segundo plano**: `backgroundThrottling: false` mantiene el análisis a
+  pleno ritmo con la ventana minimizada (una pestaña normal bajaría a ~1 fotograma por
+  segundo), y al cerrar la ventana la app se queda en la bandeja del sistema.
+
+### Descargarla ya hecha
+
+Cada ejecución del workflow **App de escritorio** deja los ejecutables como artefactos:
+pestaña *Actions* del repositorio → la ejecución más reciente → sección *Artifacts*:
+
+| Archivo | Para qué |
+| --- | --- |
+| `PostureFix-portable-1.0.0.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-1.0.0.exe` | Windows con instalador y acceso directo |
+| `PostureFix-1.0.0.AppImage` | Linux |
+
+### Construirla uno mismo
+
+```bash
+npm install
+npm run desktop         # la abre en modo desarrollo
+npm run desktop:build   # genera los ejecutables en release/
+```
+
+`npm run desktop:build` empaqueta para el sistema donde se ejecuta: el `.exe` sale desde
+Windows y el AppImage desde Linux. Por eso el workflow los construye en los runners de GitHub.
+
+> `electron` y `electron-builder` son dependencias de desarrollo: sólo hacen falta para
+> empaquetar. Para trabajar sólo con la app de móvil se pueden omitir.
+
+
 ## Ajustes
 
 Desde el engranaje de la pantalla principal:
@@ -149,6 +186,8 @@ scripts/generate-assets.mjs  generador de sonidos e iconos
 web/                         versión para portátil: webcam + MediaPipe Pose
 web/src/postureVision.ts     medición de postura por webcam (con tests)
 web/build.mjs                empaquetado con esbuild
+desktop/main.js              envoltorio de escritorio (Electron)
+.github/workflows/           construcción de los ejecutables
 ```
 
 La lógica de la secuencia vive en una función pura (`step()`), compartida por las dos

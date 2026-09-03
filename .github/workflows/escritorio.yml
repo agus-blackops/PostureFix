@@ -1,0 +1,60 @@
+# Construye el ejecutable de escritorio (webcam) en los runners de GitHub.
+# Los archivos quedan como artefactos descargables de cada ejecución.
+name: App de escritorio
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'web/**'
+      - 'src/core/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/escritorio.yml'
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  build:
+    name: ${{ matrix.nombre }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            nombre: windows
+            artefactos: |
+              release/*.exe
+          - os: ubuntu-latest
+            nombre: linux
+            artefactos: |
+              release/*.AppImage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobaciones
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Empaquetar
+        run: npm run desktop:build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: posturefix-${{ matrix.nombre }}
+          path: ${{ matrix.artefactos }}
+          if-no-files-found: error

@@ -12,7 +12,9 @@
     "test": "jest",
     "assets": "node scripts/generate-assets.mjs",
     "web:build": "node web/build.mjs",
-    "web:dev": "node web/build.mjs --serve"
+    "web:dev": "node web/build.mjs --serve",
+    "desktop": "npm run web:build && electron desktop/main.js",
+    "desktop:build": "npm run web:build && electron-builder --publish never"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -32,6 +34,8 @@
     "@mediapipe/tasks-vision": "^1.0.1",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
+    "electron": "^44.1.1",
+    "electron-builder": "^26.16.0",
     "esbuild": "^0.28.2",
     "jest": "^30.5.1",
     "jest-expo": "~57.0.5",
@@ -39,5 +43,58 @@
   },
   "jest": {
     "preset": "jest-expo"
+  },
+  "build": {
+    "appId": "com.posturefix.desktop",
+    "productName": "PostureFix",
+    "copyright": "PostureFix",
+    "extraMetadata": {
+      "main": "desktop/main.js"
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "desktop/**/*",
+      "web/dist/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "PostureFix-portable-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PostureFix-instalador-${version}.exe"
+    },
+    "mac": {
+      "icon": "assets/icon.png",
+      "target": "dmg",
+      "category": "public.app-category.healthcare-fitness"
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": "AppImage",
+      "category": "Utility"
+    }
   }
 }
