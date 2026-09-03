@@ -15,7 +15,7 @@ on:
       - '.github/workflows/escritorio.yml'
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v*', 'V*']
 
 jobs:
   build:
@@ -64,7 +64,7 @@ jobs:
     # un Release, que a diferencia de los artefactos no caduca ni pide sesión.
     name: Publicar la versión
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/V')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -82,7 +82,7 @@ jobs:
         run: |
           node -e "
             const fs = require('fs');
-            const version = process.env.ETIQUETA.replace(/^v/, '');
+            const version = process.env.ETIQUETA.replace(/^v/i, '');
             const seccion = fs.readFileSync('CHANGELOG.md', 'utf8')
               .split(/^## /m)
               .find((bloque) => bloque.trimStart().startsWith(version));
