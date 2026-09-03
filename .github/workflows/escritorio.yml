@@ -4,6 +4,13 @@ name: App de escritorio
 
 on:
   workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: >-
+          Etiqueta ya existente a la que subir los ejecutables (p. ej. v1.0.1).
+          Vacío: solo construir.
+        required: false
+        default: ''
   pull_request:
     paths:
       - 'desktop/**'
@@ -64,7 +71,12 @@ jobs:
     # un Release, que a diferencia de los artefactos no caduca ni pide sesión.
     name: Publicar la versión
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/V')
+    # Al etiquetar, o a mano cuando la etiqueta ya existe y hay que colgarle
+    # los ejecutables (por ejemplo si el Release se creó desde la web).
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      startsWith(github.ref, 'refs/tags/V') ||
+      github.event.inputs.etiqueta != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -78,7 +90,7 @@ jobs:
 
       - name: Sacar las notas del CHANGELOG
         env:
-          ETIQUETA: ${{ github.ref_name }}
+          ETIQUETA: ${{ github.event.inputs.etiqueta || github.ref_name }}
         run: |
           node -e "
             const fs = require('fs');
@@ -93,7 +105,7 @@ jobs:
       - name: Publicar el Release con los ejecutables
         env:
           GH_TOKEN: ${{ github.token }}
-          ETIQUETA: ${{ github.ref_name }}
+          ETIQUETA: ${{ github.event.inputs.etiqueta || github.ref_name }}
         # La etiqueta puede llegar de dos formas: empujada con git (aquí no
         # existe todavía ningún Release) o creada desde el formulario de
         # GitHub (que ya lo ha creado). Se cubren las dos.
