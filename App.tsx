@@ -6,6 +6,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePostureMonitor } from './src/hooks/usePostureMonitor';
 import { AlertOverlay } from './src/ui/AlertOverlay';
+import { Notice } from './src/ui/Notice';
 import { PostureGauge } from './src/ui/PostureGauge';
 import { ResultsCard } from './src/ui/ResultsCard';
 import { SettingsSheet } from './src/ui/SettingsSheet';
@@ -23,7 +24,18 @@ export default function App() {
   const monitor = usePostureMonitor();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
-  const { engine, settings, history, running, calibration, headphones, alarmSound, sensorAvailable } = monitor;
+  const {
+    engine,
+    settings,
+    history,
+    running,
+    calibration,
+    calibrationQuality,
+    sensorMoved,
+    headphones,
+    alarmSound,
+    sensorAvailable,
+  } = monitor;
   const calibrated = settings.baseline != null;
   const graceProgress = engine.badMs / Math.max(1, settings.graceSeconds * 1000);
 
@@ -69,6 +81,27 @@ export default function App() {
               </Text>
             </View>
           )}
+
+          {sensorMoved ? (
+            <Notice
+              tone="danger"
+              title="¿Has movido el móvil?"
+              body="Después de un meneo el ángulo ha dado un salto grande, así que la postura que guardaste ya no describe tu espalda. La vigilancia está en pausa hasta que recalibres."
+              actions={[
+                { label: 'Recalibrar', onPress: () => void monitor.calibrate() },
+                { label: 'No lo he movido', onPress: monitor.dismissSensorMoved },
+              ]}
+            />
+          ) : null}
+
+          {calibrationQuality && !calibrationQuality.steady && !sensorMoved ? (
+            <Notice
+              tone="warn"
+              title="Calibración poco fiable"
+              body={`Las lecturas bailaban ±${calibrationQuality.spreadDeg.toFixed(1)}° mientras calibrabas. Siéntate recto, quédate quieto y repite para que las medidas sean exactas.`}
+              actions={[{ label: 'Repetir calibración', onPress: () => void monitor.calibrate() }]}
+            />
+          ) : null}
 
           <PostureGauge
             deviationDeg={engine.deviationDeg}

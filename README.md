@@ -139,9 +139,9 @@ sección *Artifacts* (caducan a los 90 días y piden sesión):
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-portable-1.0.1.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-1.0.1.exe` | Windows con instalador y acceso directo |
-| `PostureFix-1.0.1.AppImage` | Linux |
+| `PostureFix-portable-1.0.2.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-1.0.2.exe` | Windows con instalador y acceso directo |
+| `PostureFix-1.0.2.AppImage` | Linux |
 
 ### Construirla uno mismo
 
@@ -157,6 +157,28 @@ Windows y el AppImage desde Linux. Por eso el workflow los construye en los runn
 > `electron` y `electron-builder` son dependencias de desarrollo: sólo hacen falta para
 > empaquetar. Para trabajar sólo con la app de móvil se pueden omitir.
 
+
+## Cómo se afina la medida
+
+El ángulo que ve el usuario pasa por tres filtros pensados para que sea exacto y
+puntual a la vez:
+
+1. **Mediana de las tres últimas lecturas.** Descarta por completo un valor suelto
+   disparatado —el fotograma en el que el detector coloca un hombro donde no está—,
+   algo que ningún promedio sabe hacer: lo promedian y se lo tragan.
+2. **Filtro adaptativo «one euro».** Con la persona quieta suaviza mucho; en cuanto
+   la señal se mueve de verdad, se abre y deja pasar el cambio. Sobre un escalón de
+   40°, a los 200 ms va por 38,7° donde el paso bajo fijo de la 1.0.1 iba por 22,6°.
+3. **Descarte de lecturas imposibles.** En el móvil, las que se alejan de 1 g más de
+   0,22 g (estás caminando); en la webcam, los fotogramas donde no se te ve bien.
+
+La calibración usa la **mediana** de las muestras, no la media, y mide su dispersión
+para avisarte si te movías mientras calibrabas. Y si tras un meneo el ángulo da un
+salto grande, la app supone que le han movido el sensor: pausa la vigilancia y pide
+recalibrar en vez de avisar de una postura que no existe.
+
+`src/core/oneEuro.ts`, `src/core/calibration.ts` y `src/core/reposition.ts` son puros
+y están cubiertos por tests.
 
 ## Medir si funciona (el experimento)
 
@@ -184,6 +206,8 @@ Desde el engranaje de la pantalla principal:
 - **Volumen** de las alertas.
 - **Tono EAS con auriculares** y **tono EAS siempre** (también por altavoz).
 - **Voz**, **vibración**, **notificación** y **mantener la pantalla encendida**.
+- En la versión de portátil, **precisión del detector** (modelo grande o ligero) y
+  **modo feria**, que deja los tiempos cortos para enseñarlo en un stand.
 
 El botón **Probar alerta** reproduce la secuencia completa sin tener que agacharse.
 
@@ -200,7 +224,7 @@ sonidos y los iconos que se versionan en `assets/`:
 
 ## Versiones
 
-`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.0.1**, la
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.0.2**, la
 que va a la feria.
 
 ## Panel para la feria
@@ -232,7 +256,7 @@ docs/panel-feria.html        panel explicativo para el stand
 ```
 
 La lógica de la secuencia vive en una función pura (`step()`), compartida por las dos
-versiones, así que las 45 pruebas la recorren entera —pitido, cuenta atrás, alarma,
+versiones, así que las 70 pruebas la recorren entera —pitido, cuenta atrás, alarma,
 recuperación, histéresis y cortes de seguridad— sin sensores, cámara ni sonido.
 
 ## Limitaciones

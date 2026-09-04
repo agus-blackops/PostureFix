@@ -1,4 +1,5 @@
 import { sanitizeHistory, type SessionRecord } from '../../src/core/sessionLog';
+import type { ModelQuality } from './detector';
 import type { PostureMetrics } from './postureVision';
 
 const STORAGE_KEY = 'posturefix.web.v1';
@@ -23,6 +24,8 @@ export interface WebSettings {
    * comparar para saber si los avisos sirven de algo.
    */
   controlMode: boolean;
+  /** Modelo de detección: 'full' sitúa mejor los puntos, 'lite' pide menos CPU. */
+  modelQuality: ModelQuality;
 }
 
 export const DEFAULT_SETTINGS: WebSettings = {
@@ -36,6 +39,7 @@ export const DEFAULT_SETTINGS: WebSettings = {
   notificationsEnabled: true,
   fps: 15,
   controlMode: false,
+  modelQuality: 'full',
 };
 
 export const LIMITS = {
@@ -62,6 +66,7 @@ function sanitize(raw: Partial<WebSettings> | null): WebSettings {
     graceSeconds: clamp(Number(merged.graceSeconds) || DEFAULT_SETTINGS.graceSeconds, LIMITS.graceSeconds.min, LIMITS.graceSeconds.max),
     volume: clamp(Number(merged.volume), LIMITS.volume.min, LIMITS.volume.max),
     fps: clamp(Number(merged.fps) || DEFAULT_SETTINGS.fps, LIMITS.fps.min, LIMITS.fps.max),
+    modelQuality: merged.modelQuality === 'lite' ? 'lite' : 'full',
   };
 }
 

@@ -1,5 +1,29 @@
 # Cambios
 
+## 1.0.2
+
+Versión centrada en medir mejor: los mismos avisos, pero sobre un número más
+fiable.
+
+- **Suavizado nuevo: mediana de 3 + filtro adaptativo** («one euro»). El paso
+  bajo anterior obligaba a elegir entre ruido y retardo. Medido sobre un
+  escalón de 40°, a los 200 ms el ángulo va por 38,7° en vez de 22,6°: la
+  alerta deja de llegar tarde. Y un fotograma suelto en el que el detector se
+  inventa un hombro ya no mueve la medida ni una décima, cuando antes la
+  desplazaba 6°.
+- **Calibración con mediana en vez de media.** Un respingo al final de la
+  cuenta ya no tuerce la referencia de toda la sesión. Además se mide cuánto
+  bailaban las lecturas y la app avisa si conviene repetir.
+- **Detecta que le han movido el sensor.** Si tras un meneo el ángulo pega un
+  salto, la app deduce que el móvil se ha deslizado en el bolsillo o que han
+  movido el portátil: pone la vigilancia en pausa y pide recalibrar, en lugar
+  de disparar alarmas por una postura que nadie tiene. Era la causa número uno
+  de avisos falsos.
+- **Modelo de detección más preciso en la versión de webcam** (9,4 MB en vez de
+  5,8), seleccionable en ajustes: si el portátil va justo, se vuelve al ligero.
+- **Modo feria**: un botón deja los tiempos cortos para el stand —la secuencia
+  completa en unos 5 s en vez de 8,3— y los devuelve al salir.
+
 ## 1.0.1
 
 Versión preparada para la feria de ciencias: además de avisar, la app ahora **mide si avisar

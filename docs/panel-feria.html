@@ -468,7 +468,7 @@
 
 <div class="hoja">
   <header class="cabecera">
-    <p class="marca"><b>PostureFix 1.0.1</b> <span>Proyecto para la feria de ciencias</span></p>
+    <p class="marca"><b>PostureFix 1.0.2</b> <span>Proyecto para la feria de ciencias</span></p>
     <h1>
       Te avisa
       <span class="pregunta">antes de que te encorves</span>
@@ -599,7 +599,9 @@
         <p class="formula">θ = arccos( (a⃗ · b⃗) / (|a⃗| · |b⃗|) )</p>
         <p class="apunte">
           Si el móvil se agita, la aceleración propia se suma a la gravedad y el ángulo deja de
-          significar nada: las lecturas que se alejan de 1 g más de 0,22 g se descartan.
+          significar nada: las lecturas que se alejan de 1 g más de 0,22 g se descartan. Y si tras
+          un meneo el ángulo ha dado un salto, la app supone que le han movido el sensor y pide
+          recalibrar en vez de avisar de una postura que nadie tiene.
         </p>
       </article>
 
@@ -802,7 +804,8 @@
       <div><dt>Corte de seguridad</dt><dd>45 s</dd></div>
       <div><dt>Muestreo (móvil)</dt><dd>20 lecturas/s</dd></div>
       <div><dt>Análisis (webcam)</dt><dd>15 fotogramas/s</dd></div>
-      <div><dt>Suavizado</dt><dd>τ = 300–400 ms</dd></div>
+      <div><dt>Suavizado</dt><dd>mediana de 3 + filtro adaptativo</dd></div>
+      <div><dt>Calibración</dt><dd>mediana de 8 lecturas</dd></div>
       <div><dt>Lecturas válidas</dt><dd>1 g ± 0,22 g</dd></div>
       <div><dt>Pitido</dt><dd>1046 / 1568 Hz</dd></div>
       <div><dt>Alarma con auriculares</dt><dd>853 + 960 Hz (EAS)</dd></div>

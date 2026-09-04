@@ -76,6 +76,33 @@
       .setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
       .setting output { color: var(--muted); font-size: 13px; min-width: 56px; text-align: right; }
       footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+      .aviso {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--warn, #ffc24b);
+        background: var(--surface-alt);
+        font-size: 13px;
+      }
+      .aviso.grave { border-color: var(--danger); }
+      .aviso b { color: var(--warn, #ffc24b); }
+      .aviso.grave b { color: var(--danger); }
+      .aviso-acciones { display: flex; gap: 8px; margin-top: 4px; }
+      .aviso-acciones button { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; }
+      .setting select, .setting button {
+        font: inherit;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--surface-alt);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .setting button.activo { border-color: var(--accent); color: var(--accent); }
+
       .control-mode {
         display: flex;
         gap: 10px;
@@ -148,6 +175,15 @@
             <canvas id="overlay"></canvas>
           </div>
           <p id="status"></p>
+
+          <div id="aviso" class="aviso" hidden>
+            <b id="aviso-titulo"></b>
+            <span id="aviso-texto"></span>
+            <span class="aviso-acciones">
+              <button id="aviso-recalibrar" type="button">Recalibrar</button>
+              <button id="aviso-descartar" type="button">Descartar</button>
+            </span>
+          </div>
         </section>
 
         <section class="card">
@@ -235,6 +271,23 @@
           <label for="set-fps">Análisis por segundo<small>Menos fotogramas, menos CPU. La postura cambia despacio.</small></label>
           <input type="range" id="set-fps" min="5" max="30" step="1" />
           <output id="val-fps"></output>
+        </div>
+        <div class="setting">
+          <label for="set-modelo">
+            Precisión del detector
+            <small>El modelo grande sitúa mejor los puntos; el ligero va más suelto en equipos justos.</small>
+          </label>
+          <select id="set-modelo">
+            <option value="full">Alta (9,4 MB)</option>
+            <option value="lite">Ligera (5,8 MB)</option>
+          </select>
+        </div>
+        <div class="setting">
+          <label for="set-feria">
+            Modo feria
+            <small>Tiempos cortos para enseñarlo en un stand: la secuencia entera en unos 5 s.</small>
+          </label>
+          <button id="set-feria" type="button">Activar</button>
         </div>
 
         <h2>Sonido y avisos</h2>

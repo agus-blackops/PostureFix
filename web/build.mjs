@@ -16,8 +16,12 @@ import * as esbuild from 'esbuild';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
 const DIST = join(ROOT, 'web', 'dist');
-const MODEL_NAME = 'pose_landmarker_lite.task';
-const MODEL_URL = `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/${MODEL_NAME}`;
+/** Los dos modelos que ofrece la app: precisión alta y modo ligero. */
+const MODELS = ['full', 'lite'];
+const modelName = (quality) => `pose_landmarker_${quality}.task`;
+const modelUrl = (quality) =>
+  `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${quality}` +
+  `/float16/1/${modelName(quality)}`;
 
 const serve = process.argv.includes('--serve');
 const skipModel = process.argv.includes('--skip-model');
@@ -32,21 +36,24 @@ const exists = async (path) => {
 };
 
 /**
- * El modelo de MediaPipe (5,8 MB) no se versiona: se descarga la primera vez.
- * Si no hay red, la app tira del CDN al arrancar, así que no es bloqueante.
+ * Los modelos de MediaPipe no se versionan: se descargan la primera vez. Si no
+ * hay red, la app tira del CDN al arrancar, así que no es bloqueante.
  */
-async function ensureModel() {
-  const target = join(DIST, 'models', MODEL_NAME);
-  if (skipModel || (await exists(target))) return;
-  await mkdir(dirname(target), { recursive: true });
-  process.stdout.write(`Descargando ${MODEL_NAME} (5,8 MB)… `);
-  try {
-    const response = await fetch(MODEL_URL);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    await writeFile(target, Buffer.from(await response.arrayBuffer()));
-    console.log('listo');
-  } catch (error) {
-    console.log(`no se pudo (${error.message}); la app lo bajará del CDN al arrancar`);
+async function ensureModels() {
+  for (const quality of MODELS) {
+    const target = join(DIST, 'models', modelName(quality));
+    if (skipModel || (await exists(target))) continue;
+    await mkdir(dirname(target), { recursive: true });
+    process.stdout.write(`Descargando ${modelName(quality)}… `);
+    try {
+      const response = await fetch(modelUrl(quality));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      await writeFile(target, bytes);
+      console.log(`${(bytes.length / 1e6).toFixed(1)} MB`);
+    } catch (error) {
+      console.log(`no se pudo (${error.message}); la app lo bajará del CDN al arrancar`);
+    }
   }
 }
 
@@ -58,7 +65,7 @@ await writeFile(join(DIST, 'index.html'), await readFile(join(ROOT, 'web', 'inde
 await cp(join(ROOT, 'assets', 'sounds'), join(DIST, 'sounds'), { recursive: true });
 // El runtime WASM de MediaPipe, servido en local en vez de desde un CDN.
 await cp(join(ROOT, 'node_modules', '@mediapipe', 'tasks-vision', 'wasm'), join(DIST, 'wasm'), { recursive: true });
-await ensureModel();
+await ensureModels();
 
 const options = {
   entryPoints: [join(ROOT, 'web', 'src', 'main.ts')],

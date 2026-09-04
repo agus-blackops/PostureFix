@@ -5,7 +5,6 @@ import {
   deviationFrom,
   extractMetrics,
   selectSubject,
-  smoothMetrics,
   type Landmark,
 } from '../postureVision';
 
@@ -129,15 +128,4 @@ describe('postureVision', () => {
     });
   });
 
-  it('el filtro arranca en la primera muestra y converge', () => {
-    const base = upright();
-    const hunched = extractMetrics(skeleton({ earY: 0.45 }))!;
-    expect(smoothMetrics(null, base, 66, 300)).toEqual(base);
-
-    let smoothed = base;
-    for (let i = 0; i < 100; i++) {
-      smoothed = smoothMetrics(smoothed, hunched, 66, 300);
-    }
-    expect(smoothed.headLift).toBeCloseTo(hunched.headLift, 4);
-  });
 });

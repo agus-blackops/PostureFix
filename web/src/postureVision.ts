@@ -43,6 +43,9 @@ export interface PostureMetrics {
   tiltDeg: number;
 }
 
+/** Las cuatro medidas, en el orden en que se suavizan y se calibran. */
+export const METRIC_KEYS = ['shoulderWidth', 'headLift', 'shoulderY', 'tiltDeg'] as const;
+
 export type PostureCause = 'none' | 'hunch' | 'lean' | 'slide' | 'tilt';
 
 export interface Deviation {
@@ -122,26 +125,6 @@ export function selectSubject(
     }
   }
   return best;
-}
-
-/** Filtro paso bajo sobre las medidas, para que el número no baile. */
-export function smoothMetrics(
-  previous: PostureMetrics | null,
-  sample: PostureMetrics,
-  dtMs: number,
-  tauMs: number
-): PostureMetrics {
-  if (!previous) {
-    return sample;
-  }
-  const alpha = 1 - Math.exp(-Math.max(dtMs, 0) / Math.max(tauMs, 1));
-  const mix = (a: number, b: number) => a + alpha * (b - a);
-  return {
-    shoulderWidth: mix(previous.shoulderWidth, sample.shoulderWidth),
-    headLift: mix(previous.headLift, sample.headLift),
-    shoulderY: mix(previous.shoulderY, sample.shoulderY),
-    tiltDeg: mix(previous.tiltDeg, sample.tiltDeg),
-  };
 }
 
 /**

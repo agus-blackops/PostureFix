@@ -2,13 +2,19 @@ import { Accelerometer } from 'expo-sensors';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { calibrateVectors } from '../core/calibration';
+import { angleBetweenDeg, isTrustedSample, type Vector3 } from '../core/orientation';
 import {
-  angleBetweenDeg,
-  averageVector,
-  isTrustedSample,
-  lowPass,
-  type Vector3,
-} from '../core/orientation';
+  createSmootherBank,
+  smoothBankStep,
+  type SmootherBank,
+} from '../core/oneEuro';
+import {
+  clearReposition,
+  createReposition,
+  repositionStep,
+  type RepositionState,
+} from '../core/reposition';
 import {
   DEFAULT_ENGINE_CONFIG,
   MESSAGES,
@@ -38,14 +44,19 @@ import { useHeadphones, type HeadphonesInfo } from './useHeadphones';
 
 /** 20 lecturas por segundo: suficiente para la postura y suave con la batería. */
 const SENSOR_INTERVAL_MS = 50;
-/** Suavizado del acelerómetro. Filtra temblores sin retrasar la detección. */
-const SMOOTHING_TAU_MS = 300;
 /** Cuánto puede alejarse de 1 g una lectura y seguir siendo fiable. */
 const MOTION_TOLERANCE_G = 0.22;
 /** Duración de la calibración con la espalda recta. */
 const CALIBRATION_MS = 1500;
 
 export type CalibrationState = 'none' | 'calibrating' | 'done';
+
+export interface CalibrationQuality {
+  /** Cuánto bailaban las lecturas al calibrar, en grados. */
+  spreadDeg: number;
+  /** `false` cuando conviene repetir la calibración. */
+  steady: boolean;
+}
 
 export interface PostureMonitor {
   engine: EngineState;
@@ -56,6 +67,12 @@ export interface PostureMonitor {
   running: boolean;
   sensorAvailable: boolean | null;
   calibration: CalibrationState;
+  /** Calidad de la última calibración, o `null` si nunca se calibró. */
+  calibrationQuality: CalibrationQuality | null;
+  /** `true` cuando parece que el móvil se ha movido de sitio. */
+  sensorMoved: boolean;
+  /** Descarta el aviso de sensor movido sin recalibrar. */
+  dismissSensorMoved: () => void;
   headphones: HeadphonesInfo;
   alarmSound: AlarmSound;
   start: () => Promise<void>;
@@ -75,6 +92,8 @@ export function usePostureMonitor(): PostureMonitor {
   const [running, setRunning] = useState(false);
   const [sensorAvailable, setSensorAvailable] = useState<boolean | null>(null);
   const [calibration, setCalibration] = useState<CalibrationState>('none');
+  const [calibrationQuality, setCalibrationQuality] = useState<CalibrationQuality | null>(null);
+  const [sensorMoved, setSensorMoved] = useState(false);
   const [history, setHistory] = useState<SessionRecord[]>([]);
 
   const headphones = useHeadphones(settings.manualHeadphones);
@@ -83,7 +102,9 @@ export function usePostureMonitor(): PostureMonitor {
   const engineRef = useRef<EngineState>(engine);
   const settingsRef = useRef<Settings>(settings);
   const headphonesRef = useRef<HeadphonesInfo>(headphones);
+  const smootherRef = useRef<SmootherBank<'x' | 'y' | 'z'>>(createSmootherBank(['x', 'y', 'z'] as const));
   const smoothedRef = useRef<Vector3 | null>(null);
+  const repositionRef = useRef<RepositionState>(createReposition());
   const lastSampleAtRef = useRef<number | null>(null);
   const calibrationSamplesRef = useRef<Vector3[] | null>(null);
   const historyRef = useRef<SessionRecord[]>(history);
@@ -196,13 +217,30 @@ export function usePostureMonitor(): PostureMonitor {
         return;
       }
 
-      const smoothed = lowPass(smoothedRef.current, sample, dtMs, SMOOTHING_TAU_MS);
+      const smoothing = smoothBankStep(smootherRef.current, sample, dtMs);
+      smootherRef.current = smoothing.bank;
+      const smoothed = smoothing.value;
       smoothedRef.current = smoothed;
 
       const baseline = settingsRef.current.baseline;
       if (!baseline) return;
 
       const deviationDeg = angleBetweenDeg(baseline, smoothed);
+      const trusted = isTrustedSample(sample, MOTION_TOLERANCE_G);
+
+      // ¿El móvil se ha movido de sitio? Entonces la referencia ya no vale y
+      // avisar sería alarmar por una postura que nadie tiene.
+      // Se juzga con la lectura cruda: salta en la primera muestra buena,
+      // mientras que la suavizada tarda y ya no se distingue de encorvarse.
+      const reposition = repositionStep(repositionRef.current, {
+        deviationDeg: angleBetweenDeg(baseline, sample),
+        trusted,
+        dtMs,
+      });
+      if (reposition.suspected !== repositionRef.current.suspected) {
+        setSensorMoved(reposition.suspected);
+      }
+      repositionRef.current = reposition;
 
       // Sin vigilancia activa sólo refrescamos el ángulo para la interfaz.
       if (engineRef.current.phase === 'idle') {
@@ -216,7 +254,9 @@ export function usePostureMonitor(): PostureMonitor {
         {
           deviationDeg,
           dtMs,
-          trusted: isTrustedSample(sample, MOTION_TOLERANCE_G),
+          // Con el sensor recolocado las medidas no significan nada: se
+          // congela todo hasta que el usuario recalibre.
+          trusted: trusted && !reposition.suspected,
         },
         configRef.current
       );
@@ -279,12 +319,18 @@ export function usePostureMonitor(): PostureMonitor {
     const samples = calibrationSamplesRef.current ?? [];
     calibrationSamplesRef.current = null;
 
-    const baseline = averageVector(samples.filter((s) => isTrustedSample(s, MOTION_TOLERANCE_G)));
-    if (!baseline) {
+    const calibracion = calibrateVectors(samples.filter((s) => isTrustedSample(s, MOTION_TOLERANCE_G)));
+    if (!calibracion) {
       setCalibration(settingsRef.current.baseline ? 'done' : 'none');
       return;
     }
 
+    const { baseline, spreadDeg, steady } = calibracion;
+    setCalibrationQuality({ spreadDeg, steady });
+
+    smootherRef.current = createSmootherBank(['x', 'y', 'z'] as const);
+    repositionRef.current = clearReposition(createReposition());
+    setSensorMoved(false);
     smoothedRef.current = baseline;
     // Al recalibrar se reinicia el ciclo en curso, sin perder las estadísticas.
     engineRef.current = running
@@ -293,7 +339,10 @@ export function usePostureMonitor(): PostureMonitor {
     setEngine(engineRef.current);
     persist({ ...settingsRef.current, baseline });
     setCalibration('done');
-    speak('Postura guardada.', settingsRef.current.voiceEnabled);
+    speak(
+      steady ? 'Postura guardada.' : 'Postura guardada, pero te movías. Conviene repetir.',
+      settingsRef.current.voiceEnabled
+    );
   }, [persist, running]);
 
   /** Guarda la sesión que acaba de terminar (si duró lo suficiente). */
@@ -319,6 +368,11 @@ export function usePostureMonitor(): PostureMonitor {
     // Contadores a cero para que la próxima sesión empiece limpia.
     engineRef.current = { ...createInitialState(), deviationDeg: engineState.deviationDeg };
     setEngine(engineRef.current);
+  }, []);
+
+  const dismissSensorMoved = useCallback(() => {
+    repositionRef.current = clearReposition(repositionRef.current);
+    setSensorMoved(false);
   }, []);
 
   const clearHistory = useCallback(() => {
@@ -383,6 +437,9 @@ export function usePostureMonitor(): PostureMonitor {
     running,
     sensorAvailable,
     calibration,
+    calibrationQuality,
+    sensorMoved,
+    dismissSensorMoved,
     headphones,
     alarmSound,
     start,

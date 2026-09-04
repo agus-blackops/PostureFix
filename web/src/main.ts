@@ -14,14 +14,30 @@ import {
   type EngineState,
   type Phase,
 } from '../../src/core/postureEngine';
+import {
+  MAX_CALIBRATION_SPREAD_DEG,
+  medianDistance,
+  medianRecord,
+} from '../../src/core/calibration';
+import {
+  createSmootherBank,
+  smoothBankStep,
+  type SmootherBank,
+} from '../../src/core/oneEuro';
+import {
+  clearReposition,
+  createReposition,
+  repositionStep,
+  type RepositionState,
+} from '../../src/core/reposition';
 import { WebAlerts } from './alerts';
-import { createPoseLandmarker, startCamera, stopCamera } from './detector';
+import { createPoseLandmarker, startCamera, stopCamera, type ModelQuality } from './detector';
 import {
   CAUSE_LABEL,
+  METRIC_KEYS,
   POSE,
   deviationFrom,
   selectSubject,
-  smoothMetrics,
   type Landmark,
   type PostureCause,
   type PostureMetrics,
@@ -44,7 +60,7 @@ import {
 /** La inyecta esbuild desde el package.json al construir. */
 declare const __VERSION__: string;
 
-const SMOOTHING_TAU_MS = 400;
+
 /**
  * Cuánto vale la última postura vista. El bucle corre más rápido que la cámara,
  * así que muchos ciclos no traen fotograma nuevo; eso no significa que hayas
@@ -92,6 +108,11 @@ const ui = {
   alerts: el('stat-alerts'),
   badTime: el('stat-bad'),
   sessionTime: el('stat-session'),
+  notice: el('aviso'),
+  noticeTitle: el('aviso-titulo'),
+  noticeText: el('aviso-texto'),
+  noticeRecalibrate: el<HTMLButtonElement>('aviso-recalibrar'),
+  noticeDismiss: el<HTMLButtonElement>('aviso-descartar'),
   historyEmpty: el('historial-vacio'),
   comparison: el('comparativa'),
   barControl: el('barra-control'),
@@ -113,7 +134,9 @@ const ui = {
     easAlways: el<HTMLInputElement>('set-eas'),
     voiceEnabled: el<HTMLInputElement>('set-voice'),
     notificationsEnabled: el<HTMLInputElement>('set-notify'),
+    modelQuality: el<HTMLSelectElement>('set-modelo'),
   },
+  fairMode: el<HTMLButtonElement>('set-feria'),
   values: {
     thresholdDeg: el('val-threshold'),
     graceSeconds: el('val-grace'),
@@ -129,6 +152,8 @@ let landmarker: PoseLandmarker | null = null;
 let running = false;
 let timer: number | null = null;
 let smoothed: PostureMetrics | null = null;
+let smoother: SmootherBank<keyof PostureMetrics & string> = createSmootherBank(METRIC_KEYS);
+let reposition: RepositionState = createReposition();
 let lastFrameAt: number | null = null;
 let lastVideoTime = -1;
 let calibrationSamples: PostureMetrics[] | null = null;
@@ -136,6 +161,8 @@ let cause: PostureCause = 'none';
 let history: SessionRecord[] = [];
 /** Inicio de la sesión en curso, para guardarla al parar. */
 let sessionStartedAt = 0;
+/** Dispersión de la última calibración, en grados. */
+let spreadDeg = 0;
 /** El análisis es síncrono: sin esto los avisos del temporizador se apilan. */
 let busy = false;
 /** Momento de la última detección válida (`performance.now()`). */
@@ -230,7 +257,9 @@ function detect(): void {
 
   if (metrics) {
     lastSeenAt = nowMs;
-    smoothed = smoothMetrics(smoothed, metrics, dtMs, SMOOTHING_TAU_MS);
+    const smoothing = smoothBankStep(smoother, metrics, dtMs);
+    smoother = smoothing.bank;
+    smoothed = smoothing.value;
     if (calibrationSamples) {
       calibrationSamples.push(metrics);
     }
@@ -243,10 +272,33 @@ function detect(): void {
   const deviation = baseline && smoothed && trusted ? deviationFrom(baseline, smoothed) : null;
   cause = deviation?.cause ?? 'none';
 
+  // Si te pierde de vista y al recuperarte el ángulo ha dado un salto, lo más
+  // probable es que se haya movido el portátil, no tu espalda. Se mira la
+  // medida **cruda**, que salta en el primer fotograma bueno: la suavizada
+  // tarda un segundo largo en llegar y para entonces ya no se distingue de
+  // alguien que se ha encorvado despacio.
+  if (baseline) {
+    const antes = reposition.suspected;
+    const crudo = metrics ? deviationFrom(baseline, metrics).deg : engine.deviationDeg;
+    reposition = repositionStep(reposition, { deviationDeg: crudo, trusted, dtMs });
+    if (reposition.suspected !== antes) {
+      renderNotice();
+    }
+  }
+
   if (engine.phase === 'idle') {
     engine = { ...engine, deviationDeg: deviation?.deg ?? engine.deviationDeg };
   } else {
-    const result = step(engine, { deviationDeg: deviation?.deg ?? engine.deviationDeg, dtMs, trusted }, config());
+    const result = step(
+      engine,
+      {
+        deviationDeg: deviation?.deg ?? engine.deviationDeg,
+        dtMs,
+        // Con la cámara recolocada las medidas no significan nada.
+        trusted: trusted && !reposition.suspected,
+      },
+      config()
+    );
     engine = result.state;
     result.actions.forEach(runAction);
   }
@@ -350,6 +402,29 @@ function render(): void {
   }
 }
 
+// --------------------------------------------------------------- avisos ---
+
+/** Aviso de sensor movido o de calibración poco fiable, con sus acciones. */
+function renderNotice(): void {
+  const movida = reposition.suspected;
+  const calibracionFloja = spreadDeg > MAX_CALIBRATION_SPREAD_DEG;
+
+  ui.notice.hidden = !movida && !calibracionFloja;
+  ui.notice.classList.toggle('grave', movida);
+  ui.noticeDismiss.hidden = !movida;
+
+  if (movida) {
+    ui.noticeTitle.textContent = '¿Se ha movido la cámara?';
+    ui.noticeText.textContent =
+      'Después de perderte de vista, el ángulo ha dado un salto grande: la postura que guardaste ya no describe tu espalda. La vigilancia está en pausa hasta que recalibres.';
+  } else if (calibracionFloja) {
+    ui.noticeTitle.textContent = 'Calibración poco fiable';
+    ui.noticeText.textContent = `Las medidas bailaban ±${spreadDeg.toFixed(
+      1
+    )}° mientras calibrabas. Siéntate recto, quédate quieto y repite para que el ángulo sea exacto.`;
+  }
+}
+
 // ------------------------------------------------------------ historial ---
 
 /** Guarda la sesión que acaba de terminar (si duró lo suficiente). */
@@ -442,7 +517,7 @@ async function ensureDetector(): Promise<boolean> {
     setStatus('Pidiendo permiso de cámara…');
     await startCamera(ui.video);
     setStatus('Cargando el detector de postura…');
-    landmarker = await createPoseLandmarker(setStatus);
+    landmarker = await createPoseLandmarker(setStatus, settings.modelQuality);
     // La primera inferencia compila los kernels y puede tardar segundos: se
     // hace aquí para que no se coma la ventana de calibración.
     setStatus('Preparando el detector…');
@@ -469,6 +544,18 @@ async function warmUp(): Promise<void> {
   }
 }
 
+/** Cambiar de modelo obliga a rehacer el detector. */
+async function rebuildDetector(): Promise<void> {
+  if (!landmarker) return;
+  const previo = landmarker;
+  landmarker = null;
+  previo.close();
+  setStatus('Cambiando de modelo…');
+  landmarker = await createPoseLandmarker(setStatus, settings.modelQuality);
+  await warmUp();
+  setStatus(`Detector listo (precisión ${settings.modelQuality === 'full' ? 'alta' : 'ligera'}).`);
+}
+
 async function calibrate(): Promise<void> {
   if (!(await ensureDetector())) return;
   ui.calibrate.disabled = true;
@@ -491,17 +578,32 @@ async function calibrate(): Promise<void> {
     return;
   }
 
-  const average = samples.reduce((acc, sample) => ({
-    shoulderWidth: acc.shoulderWidth + sample.shoulderWidth / samples.length,
-    headLift: acc.headLift + sample.headLift / samples.length,
-    shoulderY: acc.shoulderY + sample.shoulderY / samples.length,
-    tiltDeg: acc.tiltDeg + sample.tiltDeg / samples.length,
-  }), { shoulderWidth: 0, headLift: 0, shoulderY: 0, tiltDeg: 0 });
+  // Mediana en vez de media: un par de fotogramas malos ya no tuercen la
+  // referencia de toda la sesión.
+  const baseline = medianRecord(samples, METRIC_KEYS) as PostureMetrics | null;
+  if (!baseline) {
+    setStatus('No te he visto lo suficiente. Colócate frente a la cámara y repite.');
+    return;
+  }
 
-  smoothed = average;
-  update({ baseline: average });
-  setStatus('Postura guardada. Ya puedes empezar a vigilar.');
-  alerts.speak('Postura guardada.', settings.voiceEnabled);
+  // Y se mide cuánto bailaban las muestras, para poder decir si hay que repetir.
+  spreadDeg = medianDistance(samples, baseline, (sample, centro) => deviationFrom(centro, sample).deg);
+  const steady = spreadDeg <= MAX_CALIBRATION_SPREAD_DEG;
+
+  smoother = createSmootherBank(METRIC_KEYS);
+  reposition = clearReposition(createReposition());
+  smoothed = baseline;
+  update({ baseline });
+  renderNotice();
+  setStatus(
+    steady
+      ? 'Postura guardada. Ya puedes empezar a vigilar.'
+      : `Postura guardada, pero te movías (±${spreadDeg.toFixed(1)}°). Conviene repetir.`
+  );
+  alerts.speak(
+    steady ? 'Postura guardada.' : 'Postura guardada, pero te movías. Conviene repetir.',
+    settings.voiceEnabled
+  );
 }
 
 async function start(): Promise<void> {
@@ -576,6 +678,9 @@ function syncInputs(): void {
   ui.inputs.voiceEnabled.checked = settings.voiceEnabled;
   ui.inputs.notificationsEnabled.checked = settings.notificationsEnabled;
   ui.inputs.controlMode.checked = settings.controlMode;
+  ui.inputs.modelQuality.value = settings.modelQuality;
+  ui.fairMode.textContent = fairModeOn ? 'Salir' : 'Activar';
+  ui.fairMode.classList.toggle('activo', fairModeOn);
 
   ui.values.thresholdDeg.textContent = `${settings.thresholdDeg}°`;
   ui.values.graceSeconds.textContent = `${settings.graceSeconds} s`;
@@ -583,7 +688,40 @@ function syncInputs(): void {
   ui.values.fps.textContent = `${settings.fps} fps`;
 }
 
+/** Preajuste para el stand y los valores a los que volver al salir. */
+const FAIR_PRESET = { thresholdDeg: 18, graceSeconds: 1, volume: 1 } as const;
+let fairModeOn = false;
+let beforeFair: Pick<WebSettings, 'thresholdDeg' | 'graceSeconds' | 'volume'> | null = null;
+
+function toggleFairMode(): void {
+  if (fairModeOn && beforeFair) {
+    fairModeOn = false;
+    update(beforeFair);
+    beforeFair = null;
+    setStatus('Modo feria desactivado.');
+    return;
+  }
+  beforeFair = {
+    thresholdDeg: settings.thresholdDeg,
+    graceSeconds: settings.graceSeconds,
+    volume: settings.volume,
+  };
+  fairModeOn = true;
+  update(FAIR_PRESET);
+  setStatus('Modo feria: la secuencia completa tarda unos 5 s.');
+}
+
 function bindInputs(): void {
+  ui.inputs.modelQuality.addEventListener('change', () => {
+    update({ modelQuality: ui.inputs.modelQuality.value === 'lite' ? 'lite' : 'full' });
+    void rebuildDetector();
+  });
+  ui.fairMode.addEventListener('click', toggleFairMode);
+  ui.noticeRecalibrate.addEventListener('click', () => void calibrate());
+  ui.noticeDismiss.addEventListener('click', () => {
+    reposition = clearReposition(reposition);
+    renderNotice();
+  });
   ui.inputs.controlMode.addEventListener('change', () => update({ controlMode: ui.inputs.controlMode.checked }));
   ui.csv.addEventListener('click', downloadCsv);
   ui.clearHistory.addEventListener('click', () => {
@@ -620,6 +758,7 @@ function main(): void {
   bindInputs();
   render();
   renderHistory();
+  renderNotice();
 
   ui.start.addEventListener('click', () => (running ? stop() : void start()));
   ui.calibrate.addEventListener('click', () => void calibrate());

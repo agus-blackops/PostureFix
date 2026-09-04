@@ -1,29 +1,48 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 
-/** Modelo servido junto a la app (lo copia `npm run web:build`). */
-const LOCAL_MODEL = 'models/pose_landmarker_lite.task';
-/** Si no está en local, se descarga del CDN de MediaPipe la primera vez. */
-const CDN_MODEL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+/**
+ * Dos modelos de MediaPipe Pose. El grande sitúa los puntos con más exactitud
+ * —que es de lo que salen todas las medidas— a cambio de más trabajo por
+ * fotograma; en un portátil que vaya justo, el ligero mantiene el ritmo.
+ */
+export type ModelQuality = 'lite' | 'full';
 
-async function resolveModelUrl(): Promise<string> {
+export const MODEL_INFO: Record<ModelQuality, { name: string; sizeMB: number }> = {
+  lite: { name: 'pose_landmarker_lite.task', sizeMB: 5.8 },
+  full: { name: 'pose_landmarker_full.task', sizeMB: 9.4 },
+};
+
+const cdnUrl = (quality: ModelQuality) =>
+  `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${quality}` +
+  `/float16/1/${MODEL_INFO[quality].name}`;
+
+/** Prefiere el modelo servido junto a la app; si no está, tira del CDN. */
+async function resolveModelUrl(quality: ModelQuality): Promise<string> {
+  const local = `models/${MODEL_INFO[quality].name}`;
   try {
-    const response = await fetch(LOCAL_MODEL, { method: 'HEAD' });
-    if (response.ok) return LOCAL_MODEL;
+    const response = await fetch(local, { method: 'HEAD' });
+    if (response.ok) return local;
   } catch {
     // Servido desde otro sitio o sin el modelo copiado: tiramos del CDN.
   }
-  return CDN_MODEL;
+  return cdnUrl(quality);
 }
 
 /**
  * Carga MediaPipe Pose. Intenta primero con GPU y cae a CPU en los portátiles
  * cuyo navegador no expone WebGL a WASM.
  */
-export async function createPoseLandmarker(log: (message: string) => void): Promise<PoseLandmarker> {
+export async function createPoseLandmarker(
+  log: (message: string) => void,
+  quality: ModelQuality = 'full'
+): Promise<PoseLandmarker> {
   const vision = await FilesetResolver.forVisionTasks('wasm');
-  const modelAssetPath = await resolveModelUrl();
-  log(modelAssetPath === LOCAL_MODEL ? 'Cargando modelo local…' : 'Descargando modelo (5,8 MB)…');
+  const modelAssetPath = await resolveModelUrl(quality);
+  log(
+    modelAssetPath.startsWith('models/')
+      ? 'Cargando el modelo…'
+      : `Descargando el modelo (${MODEL_INFO[quality].sizeMB} MB)…`
+  );
 
   const options = (delegate: 'GPU' | 'CPU') => ({
     baseOptions: { modelAssetPath, delegate },
