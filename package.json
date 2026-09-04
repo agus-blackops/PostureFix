@@ -1,0 +1,103 @@
+{
+  "name": "posturefix",
+  "version": "1.0.2",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "assets": "node scripts/generate-assets.mjs",
+    "web:build": "node web/build.mjs",
+    "web:dev": "node web/build.mjs --serve",
+    "desktop": "npm run web:build && electron desktop/main.js",
+    "desktop:build": "npm run web:build && electron-builder --publish never"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.19",
+    "expo-audio": "~57.0.4",
+    "expo-constants": "~57.0.17",
+    "expo-haptics": "~57.0.2",
+    "expo-keep-awake": "~57.0.1",
+    "expo-notifications": "~57.0.16",
+    "expo-sensors": "~57.0.2",
+    "expo-speech": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "devDependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.2.2",
+    "electron": "^44.1.1",
+    "electron-builder": "^26.16.0",
+    "esbuild": "^0.28.2",
+    "jest": "^30.5.1",
+    "jest-expo": "~57.0.5",
+    "typescript": "~6.0.3"
+  },
+  "jest": {
+    "preset": "jest-expo"
+  },
+  "build": {
+    "appId": "com.posturefix.desktop",
+    "productName": "PostureFix",
+    "copyright": "PostureFix",
+    "extraMetadata": {
+      "main": "desktop/main.js",
+      "dependencies": {}
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "desktop/**/*",
+      "web/dist/**/*",
+      "assets/icon.png",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "PostureFix-portable-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PostureFix-instalador-${version}.exe"
+    },
+    "mac": {
+      "icon": "assets/icon.png",
+      "target": "dmg",
+      "category": "public.app-category.healthcare-fitness"
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": "AppImage",
+      "category": "Utility"
+    }
+  }
+}

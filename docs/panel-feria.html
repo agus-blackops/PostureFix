@@ -1,0 +1,867 @@
+<title>El método PostureFix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    /* Papel técnico: neutro sesgado hacia la tinta azul, no hacia el crema. */
+    --papel: #f1f4f8;
+    --papel-alto: #ffffff;
+    --reticula: #d8e0ec;
+    --borde: #c3cddd;
+    --tinta: #101a33;
+    --tinta-suave: #56658a;
+    --alerta: #e8590c;
+    --alerta-tenue: #fde4d3;
+    --bien: #157f5b;
+    --bien-tenue: #d8efe5;
+    /* Marcas de gráfico: validadas contra el fondo claro. */
+    --marca-mala: #e8590c;
+    --marca-buena: #157f5b;
+
+    --escala-1: 0.75rem;
+    --escala-2: 0.875rem;
+    --escala-3: 1.0625rem;
+    --escala-4: 1.5rem;
+    --escala-5: 2.25rem;
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --papel: #0d1220;
+      --papel-alto: #141b2e;
+      --reticula: #1e2740;
+      --borde: #29344f;
+      --tinta: #e6ebf5;
+      --tinta-suave: #93a1bf;
+      --alerta: #ff8a3d;
+      --alerta-tenue: #3a1f0e;
+      --bien: #35c08a;
+      --bien-tenue: #102c22;
+      --marca-mala: #e8681a;
+      --marca-buena: #1f9a6a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --papel: #0d1220;
+    --papel-alto: #141b2e;
+    --reticula: #1e2740;
+    --borde: #29344f;
+    --tinta: #e6ebf5;
+    --tinta-suave: #93a1bf;
+    --alerta: #ff8a3d;
+    --alerta-tenue: #3a1f0e;
+    --bien: #35c08a;
+    --bien-tenue: #102c22;
+    --marca-mala: #e8681a;
+    --marca-buena: #1f9a6a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: var(--escala-3);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hoja {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(24px, 4vw, 56px) clamp(18px, 4vw, 40px) 72px;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(32px, 5vw, 56px);
+  }
+
+  /* --- cabecera ---------------------------------------------------------- */
+
+  .cabecera { display: flex; flex-direction: column; gap: 14px; }
+
+  .marca {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+  }
+  .marca b {
+    color: var(--alerta);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    font-weight: 800;
+    font-size: clamp(3.25rem, 11vw, 7rem);
+    line-height: 0.86;
+    letter-spacing: -0.005em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 .pregunta { display: block; color: var(--alerta); }
+
+  .entradilla {
+    max-width: 62ch;
+    color: var(--tinta-suave);
+    font-size: var(--escala-4);
+    line-height: 1.35;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .tira {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--borde);
+    border: 1px solid var(--borde);
+    margin-top: 10px;
+  }
+  .tira div { background: var(--papel); padding: 12px 14px; }
+  .tira dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--tinta-suave);
+  }
+  .tira dd {
+    margin: 2px 0 0;
+    font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- estructura de secciones ------------------------------------------- */
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  .rotulo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+  }
+  .rotulo::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--borde);
+  }
+
+  h2 {
+    font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 0.95;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-size: var(--escala-3);
+    font-weight: 600;
+    margin: 0;
+  }
+
+  p { margin: 0; max-width: 68ch; }
+  .apunte { color: var(--tinta-suave); font-size: var(--escala-2); }
+
+  /* --- hipótesis ---------------------------------------------------------- */
+
+  .hipotesis {
+    border-left: 4px solid var(--alerta);
+    padding: 4px 0 4px 20px;
+    font-size: var(--escala-4);
+    line-height: 1.35;
+    max-width: 46ch;
+  }
+
+  .variables {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 20px 28px;
+    margin: 0;
+  }
+  .variables dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--alerta);
+    margin-bottom: 4px;
+  }
+  .variables dd { margin: 0; font-size: var(--escala-2); color: var(--tinta-suave); }
+  .variables dd b { color: var(--tinta); font-weight: 600; }
+
+  /* --- métodos ------------------------------------------------------------ */
+
+  .metodos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 24px;
+  }
+
+  .metodo {
+    border: 1px solid var(--borde);
+    background: var(--papel-alto);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .metodo header { display: flex; flex-direction: column; gap: 2px; }
+  .metodo .letra {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--alerta);
+  }
+  .metodo h3 {
+    font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  figure svg {
+    width: 100%;
+    height: auto;
+    /* Papel milimetrado: la retícula es la del cuaderno donde se mide. */
+    background-image:
+      linear-gradient(var(--reticula) 1px, transparent 1px),
+      linear-gradient(90deg, var(--reticula) 1px, transparent 1px);
+    background-size: 20px 20px;
+    border: 1px solid var(--borde);
+  }
+  figcaption { font-size: var(--escala-2); color: var(--tinta-suave); }
+
+  .formula {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-2);
+    background: var(--papel);
+    border: 1px solid var(--borde);
+    padding: 10px 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .mando {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: var(--escala-2);
+  }
+  .mando label { color: var(--tinta-suave); }
+  .mando input[type="range"] {
+    flex: 1;
+    min-width: 160px;
+    accent-color: var(--alerta);
+  }
+  .mando output {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-3);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 5.5em;
+    text-align: right;
+  }
+  .mando output.pasado { color: var(--alerta); }
+
+  .indicadores { width: 100%; border-collapse: collapse; font-size: var(--escala-2); }
+  .indicadores th, .indicadores td {
+    text-align: left;
+    padding: 8px 10px 8px 0;
+    border-bottom: 1px solid var(--borde);
+    vertical-align: top;
+  }
+  .indicadores th {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--tinta-suave);
+    font-weight: 500;
+  }
+  .indicadores tbody th { color: var(--alerta); text-transform: none; letter-spacing: 0; font-size: var(--escala-2); }
+  .indicadores tr:last-child td, .indicadores tr:last-child th { border-bottom: 0; }
+
+  /* --- secuencia ---------------------------------------------------------- */
+
+  .secuencia {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1px;
+    background: var(--borde);
+    border: 1px solid var(--borde);
+  }
+  .paso {
+    background: var(--papel-alto);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .paso .momento {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    letter-spacing: 0.08em;
+    color: var(--tinta-suave);
+    font-variant-numeric: tabular-nums;
+  }
+  .paso .n {
+    font-family: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 0.8;
+    color: var(--alerta);
+  }
+  .paso h3 { font-size: var(--escala-3); }
+  .paso p { font-size: var(--escala-2); color: var(--tinta-suave); }
+  .paso.final { background: var(--alerta-tenue); }
+
+  .vuelta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bien-tenue);
+    border: 1px solid var(--borde);
+    border-top: 0;
+    padding: 16px 18px;
+  }
+  .vuelta .tic {
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--bien);
+  }
+  .vuelta h3 { font-size: var(--escala-3); }
+  .vuelta p { font-size: var(--escala-2); color: var(--tinta-suave); }
+
+  /* --- experimento -------------------------------------------------------- */
+
+  .experimento { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; }
+
+  .pasos-exp { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 10px; }
+  .pasos-exp li { font-size: var(--escala-2); }
+  .pasos-exp b { font-weight: 600; }
+
+  .grafico {
+    border: 1px solid var(--borde);
+    background: var(--papel-alto);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .grafico .titulo { font-weight: 600; font-size: var(--escala-2); }
+  .grafico .ejemplo {
+    display: inline-block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--borde);
+    color: var(--tinta-suave);
+    padding: 2px 7px;
+  }
+  .barra-fila { display: flex; flex-direction: column; gap: 5px; }
+  .barra-fila .etiqueta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--escala-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .barra-fila .valor { font-weight: 600; }
+  .pista { height: 14px; background: var(--papel); border: 1px solid var(--borde); }
+  .pista i { display: block; height: 100%; }
+  .eje {
+    display: flex;
+    justify-content: space-between;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-1);
+    color: var(--tinta-suave);
+  }
+  .conclusion-ej {
+    font-size: var(--escala-2);
+    border-top: 1px solid var(--borde);
+    padding-top: 12px;
+    color: var(--tinta-suave);
+  }
+  .conclusion-ej b { color: var(--tinta); }
+
+  /* --- ficha técnica ------------------------------------------------------ */
+
+  .ficha {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0 32px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: var(--escala-2);
+    margin: 0;
+  }
+  .ficha > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 0;
+    border-bottom: 1px dotted var(--borde);
+  }
+  .ficha dt { color: var(--tinta-suave); }
+  .ficha dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+  footer {
+    border-top: 2px solid var(--tinta);
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: var(--escala-2);
+    color: var(--tinta-suave);
+  }
+  footer b { color: var(--tinta); }
+
+  a { color: var(--alerta); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, input:focus-visible {
+    outline: 2px solid var(--alerta);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+
+  .pista i, #vector-actual, #arco { transition: all 120ms linear; }
+
+  @media print {
+    @page { margin: 1.4cm; }
+    body { background: #fff; }
+    .hoja { padding: 0; gap: 28px; }
+    section, .metodo, .grafico { break-inside: avoid; }
+    .mando { display: none; }
+  }
+</style>
+
+<div class="hoja">
+  <header class="cabecera">
+    <p class="marca"><b>PostureFix 1.0.2</b> <span>Proyecto para la feria de ciencias</span></p>
+    <h1>
+      Te avisa
+      <span class="pregunta">antes de que te encorves</span>
+    </h1>
+    <p class="entradilla">
+      Una app que mide tu postura veinte veces por segundo y, si te agachas demasiado tiempo,
+      te pega un susto. Y que se mide a sí misma para saber si de verdad sirve.
+    </p>
+
+    <dl class="tira">
+      <div>
+        <dt>Umbral</dt>
+        <dd>22°</dd>
+      </div>
+      <div>
+        <dt>Aviso a los</dt>
+        <dd>4 s</dd>
+      </div>
+      <div>
+        <dt>Tono de alarma</dt>
+        <dd>853 + 960 Hz</dd>
+      </div>
+      <div>
+        <dt>Formas de medir</dt>
+        <dd>2</dd>
+      </div>
+    </dl>
+  </header>
+
+  <section>
+    <p class="rotulo">La pregunta</p>
+    <h2>¿Un aviso inmediato corrige la postura?</h2>
+    <p class="hipotesis">
+      <b>Hipótesis:</b> si la persona recibe un aviso fuerte en los primeros segundos de estar
+      encorvada, pasará <b>menos tiempo en mala postura</b> que sin ningún aviso.
+    </p>
+    <dl class="variables">
+      <div>
+        <dt>Variable independiente</dt>
+        <dd>Que la app <b>avise o no avise</b>. Es lo único que cambia entre los dos grupos.</dd>
+      </div>
+      <div>
+        <dt>Variable dependiente</dt>
+        <dd>El <b>porcentaje del tiempo</b> que la persona pasa encorvada.</dd>
+      </div>
+      <div>
+        <dt>Variables controladas</dt>
+        <dd>
+          Misma persona, misma silla, misma mesa, misma calibración y sesiones de
+          <b>duración parecida</b>. Umbral y márgenes sin tocar entre sesiones.
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section>
+    <p class="rotulo">Cómo se mide</p>
+    <h2>Dos formas de ver lo mismo</h2>
+    <p>
+      Ninguna de las dos mide la curva de la columna: las dos miden <b>cuánto cambia tu cuerpo
+      respecto a una postura buena que tú mismo guardas al calibrar</b>. Por eso lo primero
+      siempre es sentarse bien y pulsar «calibrar».
+    </p>
+
+    <div class="metodos">
+      <article class="metodo">
+        <header>
+          <span class="letra">Método A · móvil</span>
+          <h3>El ángulo de la gravedad</h3>
+        </header>
+        <p class="apunte">
+          El acelerómetro mide la gravedad en los ejes del teléfono. Al calibrar se guarda ese
+          vector; después, el ángulo entre el guardado y el actual es cuánto te has inclinado.
+          Girar sobre ti mismo no lo cambia, así que solo reacciona a agacharse o ladearse.
+        </p>
+
+        <figure>
+          <svg viewBox="0 0 320 250" role="img"
+               aria-label="Diagrama: el ángulo theta entre el vector de gravedad guardado al calibrar y el vector actual del teléfono inclinado">
+            <defs>
+              <marker id="punta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="punta-alerta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--alerta)"></path>
+              </marker>
+            </defs>
+
+            <!-- suelo -->
+            <line x1="40" y1="210" x2="280" y2="210" stroke="currentColor" stroke-width="1.5" opacity="0.35"></line>
+
+            <!-- vector calibrado: vertical, de referencia -->
+            <line x1="160" y1="210" x2="160" y2="60" stroke="currentColor" stroke-width="2"
+                  stroke-dasharray="6 5" marker-end="url(#punta)"></line>
+            <text x="150" y="52" text-anchor="middle" font-size="12" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace">calibrado</text>
+
+            <!-- vector actual + teléfono, giran juntos -->
+            <g id="giro" transform="rotate(14 160 210)">
+              <line id="vector-actual" x1="160" y1="210" x2="160" y2="60" stroke="var(--alerta)"
+                    stroke-width="3" marker-end="url(#punta-alerta)"></line>
+              <rect x="146" y="134" width="28" height="48" rx="5" fill="var(--papel-alto)"
+                    stroke="var(--alerta)" stroke-width="2.5"></rect>
+              <line x1="153" y1="143" x2="167" y2="143" stroke="var(--alerta)" stroke-width="2"></line>
+            </g>
+
+            <!-- arco del ángulo -->
+            <path id="arco" d="M 160 140 A 70 70 0 0 1 177 143" fill="none" stroke="currentColor" stroke-width="2"></path>
+            <text id="etiqueta-angulo" x="187" y="101" font-size="15" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace" font-weight="600">14°</text>
+
+            <circle cx="160" cy="210" r="4" fill="currentColor"></circle>
+            <text x="160" y="232" text-anchor="middle" font-size="12" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace">cadera</text>
+          </svg>
+          <figcaption>
+            Mueve el control: el aviso salta cuando el ángulo entre los dos vectores pasa de 22°.
+          </figcaption>
+        </figure>
+
+        <div class="mando">
+          <label for="inclinacion">Inclinación</label>
+          <input type="range" id="inclinacion" min="0" max="60" step="1" value="14"
+                 aria-describedby="lectura-angulo">
+          <output id="lectura-angulo" for="inclinacion">14° · bien</output>
+        </div>
+
+        <p class="formula">θ = arccos( (a⃗ · b⃗) / (|a⃗| · |b⃗|) )</p>
+        <p class="apunte">
+          Si el móvil se agita, la aceleración propia se suma a la gravedad y el ángulo deja de
+          significar nada: las lecturas que se alejan de 1 g más de 0,22 g se descartan. Y si tras
+          un meneo el ángulo ha dado un salto, la app supone que le han movido el sensor y pide
+          recalibrar en vez de avisar de una postura que nadie tiene.
+        </p>
+      </article>
+
+      <article class="metodo">
+        <header>
+          <span class="letra">Método B · portátil</span>
+          <h3>Cuatro proporciones del cuerpo</h3>
+        </header>
+        <p class="apunte">
+          La webcam localiza orejas y hombros treinta veces por segundo. Todas las medidas se
+          dividen entre la anchura de hombros <b>w</b>, así que no dependen de tu estatura ni de
+          lo lejos que estés de la pantalla.
+        </p>
+
+        <figure>
+          <svg viewBox="0 0 320 250" role="img"
+               aria-label="Diagrama: puntos de orejas y hombros con las cuatro medidas: anchura de hombros, distancia orejas-hombros, altura de los hombros e inclinación de la línea de hombros">
+            <!-- silueta -->
+            <circle cx="160" cy="70" r="34" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"></circle>
+            <path d="M 108 190 L 116 138 Q 160 118 204 138 L 212 190" fill="none"
+                  stroke="currentColor" stroke-width="2" opacity="0.45"></path>
+
+            <!-- línea de hombros -->
+            <line x1="116" y1="138" x2="204" y2="146" stroke="currentColor" stroke-width="2.5"></line>
+            <circle cx="116" cy="138" r="5" fill="var(--alerta)"></circle>
+            <circle cx="204" cy="146" r="5" fill="var(--alerta)"></circle>
+            <text x="104" y="128" font-size="11" fill="var(--alerta)" font-family="IBM Plex Mono, monospace">11</text>
+            <text x="208" y="136" font-size="11" fill="var(--alerta)" font-family="IBM Plex Mono, monospace">12</text>
+
+            <!-- orejas -->
+            <circle cx="130" cy="72" r="4.5" fill="var(--alerta)"></circle>
+            <circle cx="190" cy="72" r="4.5" fill="var(--alerta)"></circle>
+            <text x="118" y="64" font-size="11" fill="var(--alerta)" font-family="IBM Plex Mono, monospace">7</text>
+            <text x="196" y="64" font-size="11" fill="var(--alerta)" font-family="IBM Plex Mono, monospace">8</text>
+
+            <!-- w: anchura de hombros -->
+            <line x1="116" y1="206" x2="204" y2="206" stroke="currentColor" stroke-width="1.5"
+                  marker-start="url(#punta)" marker-end="url(#punta)"></line>
+            <line x1="116" y1="146" x2="116" y2="206" stroke="currentColor" stroke-width="1" opacity="0.4"></line>
+            <line x1="204" y1="152" x2="204" y2="206" stroke="currentColor" stroke-width="1" opacity="0.4"></line>
+            <text x="160" y="224" text-anchor="middle" font-size="12" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace">w · anchura de hombros</text>
+
+            <!-- distancia orejas → hombros -->
+            <line x1="88" y1="72" x2="88" y2="142" stroke="currentColor" stroke-width="1.5"
+                  marker-start="url(#punta)" marker-end="url(#punta)"></line>
+            <line x1="88" y1="72" x2="126" y2="72" stroke="currentColor" stroke-width="1" opacity="0.4"></line>
+            <line x1="88" y1="142" x2="112" y2="139" stroke="currentColor" stroke-width="1" opacity="0.4"></line>
+            <text x="80" y="110" text-anchor="end" font-size="12" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace">orejas</text>
+            <text x="80" y="126" text-anchor="end" font-size="12" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace">↕ hombros</text>
+
+            <!-- inclinación de la línea de hombros -->
+            <line x1="116" y1="138" x2="204" y2="138" stroke="currentColor" stroke-width="1"
+                  stroke-dasharray="4 4" opacity="0.5"></line>
+            <text x="238" y="150" font-size="12" fill="currentColor" font-family="IBM Plex Mono, monospace">ladeo</text>
+
+            <!-- el conjunto baja en el encuadre -->
+            <line x1="272" y1="120" x2="272" y2="176" stroke="currentColor" stroke-width="1.5"
+                  marker-end="url(#punta)" opacity="0.75"></line>
+            <text x="266" y="112" text-anchor="end" font-size="12" fill="currentColor"
+                  font-family="IBM Plex Mono, monospace">te escurres</text>
+          </svg>
+          <figcaption>
+            Los cuatro indicadores salen de cuatro puntos: las orejas (7 y 8) y los hombros (11 y 12).
+          </figcaption>
+        </figure>
+
+        <table class="indicadores">
+          <thead>
+            <tr><th scope="col">Indicador</th><th scope="col">Qué delata</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Encorvarse</th>
+              <td>Las orejas se acercan a los hombros: la distancia entre ellos se acorta.</td>
+            </tr>
+            <tr>
+              <th scope="row">Acercarse</th>
+              <td>Los hombros se ven más anchos porque te echas sobre la pantalla.</td>
+            </tr>
+            <tr>
+              <th scope="row">Escurrirse</th>
+              <td>Los hombros bajan dentro del encuadre.</td>
+            </tr>
+            <tr>
+              <th scope="row">Ladearse</th>
+              <td>La línea de los hombros se inclina respecto a la calibrada.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="apunte">
+          Se toma el <b>peor</b> de los cuatro, no la suma, y se traduce a los mismos grados que usa
+          el móvil. Así ambas versiones comparten umbral y secuencia de aviso.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">Qué pasa cuando te encorvas</p>
+    <h2>El aviso sube de tono en cuatro pasos</h2>
+    <div class="secuencia">
+      <div class="paso">
+        <span class="momento">0 s → 4 s</span>
+        <span class="n">1</span>
+        <h3>Te mide en silencio</h3>
+        <p>Mientras estés por debajo del umbral no pasa nada. Si lo cruzas, empieza la cuenta.</p>
+      </div>
+      <div class="paso">
+        <span class="momento">a los 4 s</span>
+        <span class="n">2</span>
+        <h3>Pitido de susto</h3>
+        <p>Dos tonos secos de 1046 y 1568 Hz, más vibración. Suena aunque el móvil esté en silencio.</p>
+      </div>
+      <div class="paso">
+        <span class="momento">+1,6 s</span>
+        <span class="n">3</span>
+        <h3>La voz cuenta</h3>
+        <p>«Uno… dos… tres», con los números a pantalla completa, 0,9 s cada uno.</p>
+      </div>
+      <div class="paso final">
+        <span class="momento">+2,7 s</span>
+        <span class="n">4</span>
+        <h3>Alerta fuerte</h3>
+        <p>
+          Notificación de máxima prioridad y tono continuo: la señal de emergencia EAS
+          (853 + 960 Hz) si llevas auriculares, o una sirena de dos tonos por el altavoz.
+        </p>
+      </div>
+    </div>
+    <div class="vuelta">
+      <span class="tic">✓</span>
+      <div>
+        <h3>Y se apaga sola</h3>
+        <p>
+          Con 0,8 s de espalda recta se calla todo. Si nadie reacciona, la alarma se corta a los
+          45 s: avisar no es castigar.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">El experimento</p>
+    <h2>La app se mide a sí misma</h2>
+    <div class="experimento">
+      <div>
+        <p style="margin-bottom: 16px">
+          La app tiene un <b>modo control</b>: mide y registra exactamente igual, pero no pita, no
+          habla, no vibra y no enseña la pantalla roja. Ese es el grupo con el que comparar.
+        </p>
+        <ol class="pasos-exp">
+          <li>Calibra sentado con la espalda recta.</li>
+          <li>Haz una sesión con el <b>modo control</b> activado.</li>
+          <li>Haz otra de duración parecida <b>con los avisos puestos</b>.</li>
+          <li>Repite con varias personas, siempre en las mismas condiciones.</li>
+          <li>Exporta el historial a <b>CSV</b> y lleva los números al póster.</li>
+        </ol>
+        <p class="apunte" style="margin-top: 16px">
+          Las sesiones de menos de medio minuto no se guardan, porque no dicen nada. Cuando falta
+          alguno de los dos grupos, la app no inventa una conclusión: avisa de que faltan datos.
+        </p>
+      </div>
+
+      <figure class="grafico">
+        <figcaption class="titulo">
+          Tiempo en mala postura, por grupo <span class="ejemplo">Ejemplo</span>
+        </figcaption>
+
+        <div class="barra-fila">
+          <span class="etiqueta"><span>Sin avisos (control)</span><span class="valor">38,0 %</span></span>
+          <span class="pista"><i style="width: 38%; background: var(--marca-mala)"></i></span>
+        </div>
+
+        <div class="barra-fila">
+          <span class="etiqueta"><span>Con avisos</span><span class="valor">10,0 %</span></span>
+          <span class="pista"><i style="width: 10%; background: var(--marca-buena)"></i></span>
+        </div>
+
+        <div class="eje"><span>0 %</span><span>50 %</span><span>100 %</span></div>
+
+        <p class="conclusion-ej">
+          Con estos números de ejemplo, los avisos reducirían el tiempo encorvado un <b>73,7 %</b>.
+          <b>Sustitúyelos por tus propias mediciones</b>: la app calcula esta comparación sola.
+        </p>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <p class="rotulo">Ficha técnica</p>
+    <h2>Los números exactos</h2>
+    <dl class="ficha">
+      <div><dt>Umbral de mala postura</dt><dd>22°</dd></div>
+      <div><dt>Histéresis</dt><dd>6°</dd></div>
+      <div><dt>Margen antes del pitido</dt><dd>4 s</dd></div>
+      <div><dt>Recuperación</dt><dd>0,8 s</dd></div>
+      <div><dt>Corte de seguridad</dt><dd>45 s</dd></div>
+      <div><dt>Muestreo (móvil)</dt><dd>20 lecturas/s</dd></div>
+      <div><dt>Análisis (webcam)</dt><dd>15 fotogramas/s</dd></div>
+      <div><dt>Suavizado</dt><dd>mediana de 3 + filtro adaptativo</dd></div>
+      <div><dt>Calibración</dt><dd>mediana de 8 lecturas</dd></div>
+      <div><dt>Lecturas válidas</dt><dd>1 g ± 0,22 g</dd></div>
+      <div><dt>Pitido</dt><dd>1046 / 1568 Hz</dd></div>
+      <div><dt>Alarma con auriculares</dt><dd>853 + 960 Hz (EAS)</dd></div>
+      <div><dt>Sirena por altavoz</dt><dd>740 / 988 Hz</dd></div>
+    </dl>
+  </section>
+
+  <footer>
+    <p>
+      <b>Lo que no hace:</b> no ve la curva de la columna, no sustituye a un fisioterapeuta y no
+      funciona con la cámara tapada o el móvil fuera del bolsillo. El tono EAS es una
+      reproducción local de dos frecuencias; la app no emite avisos de emergencia reales.
+    </p>
+    <p>
+      <b>Privacidad:</b> en la versión de portátil el vídeo se procesa dentro del navegador y no
+      sale del equipo: no se graba ni se envía a ningún sitio.
+    </p>
+    <p>Hecho con Expo (React Native) para el móvil y MediaPipe Pose para el portátil.</p>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    const control = document.getElementById('inclinacion');
+    const lectura = document.getElementById('lectura-angulo');
+    const giro = document.getElementById('giro');
+    const arco = document.getElementById('arco');
+    const etiqueta = document.getElementById('etiqueta-angulo');
+    const UMBRAL = 22;
+    const ORIGEN = { x: 160, y: 210 };
+    const RADIO = 70;
+
+    function pintar(grados) {
+      giro.setAttribute('transform', `rotate(${grados} ${ORIGEN.x} ${ORIGEN.y})`);
+
+      // Arco desde la vertical hasta el vector inclinado, en el mismo radio.
+      const rad = (grados * Math.PI) / 180;
+      const fin = {
+        x: ORIGEN.x + RADIO * Math.sin(rad),
+        y: ORIGEN.y - RADIO * Math.cos(rad),
+      };
+      arco.setAttribute('d', `M ${ORIGEN.x} ${ORIGEN.y - RADIO} A ${RADIO} ${RADIO} 0 0 1 ${fin.x.toFixed(1)} ${fin.y.toFixed(1)}`);
+
+      // Sobre la bisectriz y bien fuera del arco, para no montarse en el teléfono.
+      const medio = rad / 2;
+      etiqueta.setAttribute('x', (ORIGEN.x + 14 + (RADIO + 40) * Math.sin(medio)).toFixed(1));
+      etiqueta.setAttribute('y', (ORIGEN.y - (RADIO + 40) * Math.cos(medio)).toFixed(1));
+      etiqueta.textContent = `${grados}°`;
+
+      const pasado = grados > UMBRAL;
+      lectura.textContent = pasado ? `${grados}° · ¡aviso!` : `${grados}° · bien`;
+      lectura.classList.toggle('pasado', pasado);
+      etiqueta.setAttribute('fill', pasado ? 'var(--alerta)' : 'currentColor');
+    }
+
+    control.addEventListener('input', () => pintar(Number(control.value)));
+    pintar(Number(control.value));
+  })();
+</script>

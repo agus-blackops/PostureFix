@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "PostureFix",
+    "slug": "posturefix",
+    "version": "1.0.2",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "posturefix",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B1020",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1020"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.posturefix.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "NSMotionUsageDescription": "PostureFix usa el aceler\u00f3metro para saber cu\u00e1ndo te agachas y avisarte."
+      }
+    },
+    "android": {
+      "package": "com.posturefix.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1020",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#FF7A29"
+        }
+      ]
+    ]
+  }
+}

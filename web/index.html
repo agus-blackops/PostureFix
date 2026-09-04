@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PostureFix · versión webcam</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Ccircle cx='12' cy='10' r='3.4' fill='%23ff7a29'/%3E%3Cpath d='M11.6 14 C9.5 18 12 21 15.5 22.4' stroke='%23ff7a29' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M15 22.6 H23' stroke='%23ff7a29' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --bg: #0b1020;
+        --surface: #151b33;
+        --surface-alt: #1e2646;
+        --border: #2a3358;
+        --text: #f2f5ff;
+        --muted: #98a2c8;
+        --accent: #ff7a29;
+        --good: #2ed47a;
+        --danger: #ff3b30;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+      header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+      h1 { font-size: 28px; margin: 0; letter-spacing: -0.5px; }
+      .tagline { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+      .version { font-variant-numeric: tabular-nums; opacity: 0.75; }
+      .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+      @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .stage { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+      /* Espejo: te ves como en un espejo, que es lo natural. */
+      .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+      .stage video { object-fit: cover; }
+      #status { color: var(--muted); font-size: 13px; margin: 10px 2px 0; min-height: 2.5em; }
+      .gauge { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+      #angle { font-size: 64px; font-weight: 800; line-height: 1; color: var(--good); }
+      .caption { color: var(--muted); font-size: 13px; margin-top: -4px; }
+      #phase { font-size: 18px; font-weight: 700; color: var(--good); }
+      #cause { color: var(--muted); font-size: 14px; min-height: 1.4em; }
+      .track { position: relative; width: 100%; height: 12px; border-radius: 999px; background: var(--surface-alt); overflow: hidden; }
+      .track#grace-track { height: 6px; }
+      #bar, #grace { height: 100%; width: 0; border-radius: 999px; background: var(--good); transition: width 120ms linear; }
+      #grace { background: #ffc24b; }
+      #threshold-mark { position: absolute; top: 0; width: 2px; height: 100%; background: var(--text); opacity: 0.7; }
+      .scale { display: flex; justify-content: space-between; width: 100%; color: var(--muted); font-size: 11px; }
+      .buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+      .row { display: flex; gap: 10px; }
+      button {
+        flex: 1; cursor: pointer; font: inherit; font-weight: 700;
+        padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border);
+        background: var(--surface-alt); color: var(--text);
+      }
+      button:hover:enabled { border-color: var(--accent); }
+      button:disabled { opacity: 0.6; cursor: default; }
+      #start { background: var(--accent); color: #0b1020; border-color: transparent; font-size: 17px; }
+      #start.stop { background: var(--danger); color: #fff; }
+      .stats { display: flex; gap: 10px; margin-top: 16px; }
+      .stat { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
+      .stat b { display: block; font-size: 20px; }
+      .stat span { color: var(--muted); font-size: 12px; }
+      h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 20px 0 8px; }
+      .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+      .setting label { flex: 1; }
+      .setting small { display: block; color: var(--muted); font-weight: 400; }
+      .setting input[type="range"] { width: 150px; accent-color: var(--accent); }
+      .setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+      .setting output { color: var(--muted); font-size: 13px; min-width: 56px; text-align: right; }
+      footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+      .aviso {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--warn, #ffc24b);
+        background: var(--surface-alt);
+        font-size: 13px;
+      }
+      .aviso.grave { border-color: var(--danger); }
+      .aviso b { color: var(--warn, #ffc24b); }
+      .aviso.grave b { color: var(--danger); }
+      .aviso-acciones { display: flex; gap: 8px; margin-top: 4px; }
+      .aviso-acciones button { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; }
+      .setting select, .setting button {
+        font: inherit;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--surface-alt);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .setting button.activo { border-color: var(--accent); color: var(--accent); }
+
+      .control-mode {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        margin-top: 14px;
+        padding: 12px;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .control-mode small { display: block; color: var(--muted); font-weight: 400; }
+      .control-mode input { width: 20px; height: 20px; accent-color: var(--accent); }
+      .hint { color: var(--muted); font-size: 13px; }
+      .comparativa-fila { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+      .comparativa-fila .etiqueta { width: 160px; font-size: 13px; color: var(--muted); }
+      .comparativa-fila .barra { flex: 1; height: 22px; background: var(--surface-alt); border-radius: 6px; overflow: hidden; }
+      .comparativa-fila .barra i { display: block; height: 100%; width: 0; background: var(--muted); transition: width 200ms; }
+      #barra-control i, #barra-control { background: var(--warn, #ffc24b); }
+      #barra-avisos { background: var(--good); }
+      .comparativa-fila output { width: 92px; text-align: right; font-weight: 700; }
+      #conclusion { font-size: 14px; margin: 4px 0 0; }
+      /* Cada sesión es una columna de altura completa; dentro, la barra crece
+         desde abajo. El contenedor necesita altura definida o los porcentajes
+         de las barras no resuelven contra nada. */
+      .sesiones { display: flex; align-items: stretch; gap: 4px; height: 90px; margin-top: 16px; }
+      .sesiones .sesion {
+        flex: 1;
+        max-width: 26px;
+        background: var(--surface-alt);
+        border-radius: 4px 4px 0 0;
+        display: flex;
+        align-items: flex-end;
+      }
+      .sesiones .sesion i { display: block; width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
+      .leyenda { display: flex; gap: 16px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+      .leyenda span { display: flex; align-items: center; gap: 6px; }
+      .leyenda b { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+      .sesiones .sesion.control i { background: #ffc24b; }
+      .sesiones .sesion.avisos i { background: var(--good); }
+      .alert {
+        position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 16px; text-align: center; padding: 32px; color: #fff; z-index: 10; pointer-events: none;
+        animation: pulse 0.76s infinite;
+      }
+      .alert.hidden { display: none; }
+      .alert.countdown { background: var(--accent); }
+      .alert.countdown #alert-text { font-size: 25vh; font-weight: 900; }
+      .alert.alarm { background: var(--danger); }
+      .alert.alarm #alert-text { font-size: clamp(38px, 8vw, 72px); font-weight: 900; letter-spacing: 1px; }
+      #alert-body { font-size: 18px; font-weight: 600; max-width: 30ch; }
+      @keyframes pulse { 0%, 100% { opacity: 0.86; } 50% { opacity: 1; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>PostureFix</h1>
+          <p class="tagline">
+            Versión para portátil: la webcam te vigila la espalda.
+            <span id="version" class="version"></span>
+          </p>
+        </div>
+      </header>
+
+      <div class="layout">
+        <section class="card">
+          <div class="stage">
+            <video id="video" playsinline muted></video>
+            <canvas id="overlay"></canvas>
+          </div>
+          <p id="status"></p>
+
+          <div id="aviso" class="aviso" hidden>
+            <b id="aviso-titulo"></b>
+            <span id="aviso-texto"></span>
+            <span class="aviso-acciones">
+              <button id="aviso-recalibrar" type="button">Recalibrar</button>
+              <button id="aviso-descartar" type="button">Descartar</button>
+            </span>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="gauge">
+            <div id="angle">0°</div>
+            <div class="caption">desviación de tu postura calibrada</div>
+            <div id="phase">En pausa</div>
+            <div id="cause"></div>
+            <div class="track"><div id="bar"></div><div id="threshold-mark"></div></div>
+            <div class="scale"><span>0°</span><span>umbral</span><span>70°</span></div>
+            <div class="track" id="grace-track"><div id="grace"></div></div>
+          </div>
+
+          <label class="control-mode" for="set-control">
+            <input type="checkbox" id="set-control" />
+            <span>
+              <b>Sesión de control</b>
+              <small>Mide y registra sin avisar. Es el grupo de comparación del experimento.</small>
+            </span>
+          </label>
+
+          <div class="buttons">
+            <button id="start">Empezar a vigilar</button>
+            <div class="row">
+              <button id="calibrate">Calibrar postura</button>
+              <button id="test">Probar alerta</button>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><b id="stat-alerts">0</b><span>alertas</span></div>
+            <div class="stat"><b id="stat-bad">0s</b><span>encorvado</span></div>
+            <div class="stat"><b id="stat-session">0s</b><span>sesión</span></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card" id="historial" style="margin-top: 16px">
+        <h2 style="margin-top: 0">Historial y resultados</h2>
+        <p id="historial-vacio" class="hint">
+          Aún no hay sesiones guardadas. Haz una <b>sesión de control</b> y otra normal de al menos
+          medio minuto cada una, y aquí aparecerá la comparación.
+        </p>
+
+        <div id="comparativa" hidden>
+          <div class="comparativa-fila">
+            <span class="etiqueta">Sin avisos (control)</span>
+            <span class="barra"><i id="barra-control"></i></span>
+            <output id="valor-control"></output>
+          </div>
+          <div class="comparativa-fila">
+            <span class="etiqueta">Con avisos</span>
+            <span class="barra"><i id="barra-avisos"></i></span>
+            <output id="valor-avisos"></output>
+          </div>
+          <p id="conclusion"></p>
+        </div>
+
+        <div id="sesiones" class="sesiones"></div>
+        <div class="leyenda" id="leyenda" hidden>
+          <span><b style="background: #ffc24b"></b> control (sin avisos)</span>
+          <span><b style="background: #2ed47a"></b> con avisos</span>
+          <span>altura = % del tiempo encorvado</span>
+        </div>
+
+        <div class="row" style="margin-top: 12px">
+          <button id="csv">Descargar CSV</button>
+          <button id="borrar">Borrar historial</button>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top: 16px">
+        <h2 style="margin-top: 0">Sensibilidad</h2>
+        <div class="setting">
+          <label for="set-threshold">Umbral de mala postura<small>Cuánto te puedes desviar de la postura calibrada.</small></label>
+          <input type="range" id="set-threshold" min="10" max="55" step="1" />
+          <output id="val-threshold"></output>
+        </div>
+        <div class="setting">
+          <label for="set-grace">Margen antes del pitido<small>Cuánto aguanta antes de darte el susto.</small></label>
+          <input type="range" id="set-grace" min="1" max="20" step="1" />
+          <output id="val-grace"></output>
+        </div>
+        <div class="setting">
+          <label for="set-fps">Análisis por segundo<small>Menos fotogramas, menos CPU. La postura cambia despacio.</small></label>
+          <input type="range" id="set-fps" min="5" max="30" step="1" />
+          <output id="val-fps"></output>
+        </div>
+        <div class="setting">
+          <label for="set-modelo">
+            Precisión del detector
+            <small>El modelo grande sitúa mejor los puntos; el ligero va más suelto en equipos justos.</small>
+          </label>
+          <select id="set-modelo">
+            <option value="full">Alta (9,4 MB)</option>
+            <option value="lite">Ligera (5,8 MB)</option>
+          </select>
+        </div>
+        <div class="setting">
+          <label for="set-feria">
+            Modo feria
+            <small>Tiempos cortos para enseñarlo en un stand: la secuencia entera en unos 5 s.</small>
+          </label>
+          <button id="set-feria" type="button">Activar</button>
+        </div>
+
+        <h2>Sonido y avisos</h2>
+        <div class="setting">
+          <label for="set-volume">Volumen de las alertas</label>
+          <input type="range" id="set-volume" min="0" max="1" step="0.05" />
+          <output id="val-volume"></output>
+        </div>
+        <div class="setting">
+          <label for="set-headphones">Llevo auriculares<small>Con auriculares suena el tono EAS; el navegador no puede detectarlos solo.</small></label>
+          <input type="checkbox" id="set-headphones" />
+        </div>
+        <div class="setting">
+          <label for="set-eas">Tono EAS siempre<small>Úsalo también por los altavoces del portátil.</small></label>
+          <input type="checkbox" id="set-eas" />
+        </div>
+        <div class="setting">
+          <label for="set-voice">Voz (uno, dos, tres)</label>
+          <input type="checkbox" id="set-voice" />
+        </div>
+        <div class="setting">
+          <label for="set-notify">Notificación del sistema<small>Salta aunque estés en otra pestaña.</small></label>
+          <input type="checkbox" id="set-notify" />
+        </div>
+      </section>
+
+      <footer>
+        Todo el procesamiento ocurre en tu navegador: el vídeo no se graba ni se envía a ningún sitio.
+        Si minimizas la ventana, el navegador ralentiza el análisis a ~1 fps, pero las alertas siguen sonando.
+      </footer>
+    </main>
+
+    <div id="alert-overlay" class="alert hidden">
+      <div id="alert-text"></div>
+      <div id="alert-body"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
