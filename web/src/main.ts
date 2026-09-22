@@ -83,6 +83,18 @@ const PHASE_LABEL: Record<Phase, string> = {
   cooldown: 'Recuperado',
 };
 
+/**
+ * Roles de color de Material 3 que también usa la hoja de estilos. Se repiten
+ * aquí porque el lienzo y los estilos en línea necesitan el valor, no la
+ * variable CSS.
+ */
+const ROLE = {
+  neutral: '#D8C2B6',
+  success: '#6FDB94',
+  warning: '#F5BD4B',
+  error: '#FFB4AB',
+} as const;
+
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Falta el elemento #${id}`);
@@ -98,6 +110,7 @@ const ui = {
   bar: el('bar'),
   threshold: el('threshold-mark'),
   grace: el('grace'),
+  gauge: el('gauge'),
   start: el<HTMLButtonElement>('start'),
   calibrate: el<HTMLButtonElement>('calibrate'),
   test: el<HTMLButtonElement>('test'),
@@ -329,7 +342,8 @@ function drawOverlay(landmarks: Landmark[] | null): void {
   const shoulders = [point(POSE.leftShoulder), point(POSE.rightShoulder)];
   const ears = [point(POSE.leftEar), point(POSE.rightEar)];
 
-  context.strokeStyle = engine.phase === 'alarm' ? '#FF3B30' : cause === 'none' ? '#2ED47A' : '#FFC24B';
+  context.strokeStyle =
+    engine.phase === 'alarm' ? ROLE.error : cause === 'none' ? ROLE.success : ROLE.warning;
   context.lineWidth = 4;
   context.lineCap = 'round';
 
@@ -375,14 +389,16 @@ function render(): void {
 
   const color =
     engine.phase === 'alarm' && !settings.controlMode
-      ? '#FF3B30'
-      : engine.phase === 'ok' || engine.phase === 'cooldown' || engine.phase === 'idle'
-        ? '#2ED47A'
-        : '#FFC24B';
+      ? ROLE.error
+      : engine.phase === 'idle'
+        ? ROLE.neutral
+        : engine.phase === 'ok' || engine.phase === 'cooldown'
+          ? ROLE.success
+          : ROLE.warning;
+  // Basta teñir el contenedor: anillo, cifra, píldora de estado y barra lo
+  // heredan por currentColor.
+  ui.gauge.style.color = color;
   ui.bar.style.width = cssPercent(deviation / MAX_ANGLE);
-  ui.bar.style.background = color;
-  ui.angle.style.color = color;
-  ui.phase.style.color = color;
   ui.threshold.style.left = cssPercent(settings.thresholdDeg / MAX_ANGLE);
   ui.grace.style.width = cssPercent(engine.badMs / (settings.graceSeconds * 1000));
 

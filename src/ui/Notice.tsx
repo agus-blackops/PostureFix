@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing } from './theme';
+import { Button } from './material';
+import { colors, shape, spacing, type } from './theme';
 
 interface Accion {
   label: string;
@@ -14,22 +15,29 @@ interface Props {
   actions?: Accion[];
 }
 
-/** Aviso con acciones: sensor movido, calibración inestable y similares. */
+/**
+ * Aviso con acciones (sensor movido, calibración inestable) con la forma del
+ * banner de Material 3: contenedor de color del rol, texto encima y los botones
+ * de texto alineados a la derecha.
+ */
 export function Notice({ tone, title, body, actions = [] }: Props) {
-  const color = tone === 'danger' ? colors.danger : colors.warn;
+  const container = tone === 'danger' ? colors.errorContainer : colors.warningContainer;
+  const onContainer = tone === 'danger' ? colors.onErrorContainer : colors.onWarningContainer;
+
   return (
-    <View style={[styles.card, { borderColor: color }]}>
-      <Text style={[styles.title, { color }]}>{title}</Text>
-      <Text style={styles.body}>{body}</Text>
+    <View style={[styles.banner, { backgroundColor: container }]}>
+      <Text style={[styles.title, { color: onContainer }]}>{title}</Text>
+      <Text style={[styles.body, { color: onContainer }]}>{body}</Text>
       {actions.length > 0 ? (
         <View style={styles.actions}>
           {actions.map((accion) => (
-            <Pressable
+            <Button
               key={accion.label}
+              label={accion.label}
               onPress={accion.onPress}
-              style={({ pressed }) => [styles.button, { borderColor: color, opacity: pressed ? 0.7 : 1 }]}>
-              <Text style={[styles.buttonText, { color }]}>{accion.label}</Text>
-            </Pressable>
+              variant="text"
+              color={onContainer}
+            />
           ))}
         </View>
       ) : null}
@@ -38,21 +46,12 @@ export function Notice({ tone, title, body, actions = [] }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: spacing.md,
+  banner: {
+    borderRadius: shape.large,
+    padding: spacing.lg,
     gap: spacing.xs,
   },
-  title: { fontSize: 15, fontWeight: '700' },
-  body: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  button: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  buttonText: { fontSize: 14, fontWeight: '700' },
+  title: { ...type.titleMedium },
+  body: { ...type.bodyMedium, opacity: 0.92 },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
 });

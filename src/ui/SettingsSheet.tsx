@@ -1,7 +1,8 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { LIMITS, clamp, type Settings } from '../core/settings';
-import { colors, radius, spacing } from './theme';
+import { Button, Divider, ListItem, Subheader } from './material';
+import { STATE_PRESSED, colors, shape, spacing, stateLayer, type } from './theme';
 
 interface Props {
   visible: boolean;
@@ -22,23 +23,35 @@ interface StepperProps {
   onIncrease: () => void;
 }
 
+/** Botón circular de 40 dp para los pasos, con contorno como los icon buttons de M3. */
+function StepButton({ glyph, label, onPress }: { glyph: string; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.stepButton,
+        pressed && { backgroundColor: stateLayer(colors.onSurface, STATE_PRESSED) },
+      ]}>
+      <Text style={styles.stepGlyph}>{glyph}</Text>
+    </Pressable>
+  );
+}
+
 function Stepper({ label, hint, value, onDecrease, onIncrease }: StepperProps) {
   return (
-    <View style={styles.row}>
-      <View style={styles.rowText}>
-        <Text style={styles.label}>{label}</Text>
-        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-      </View>
-      <View style={styles.stepper}>
-        <Pressable accessibilityLabel={`Bajar ${label}`} onPress={onDecrease} style={styles.stepButton}>
-          <Text style={styles.stepText}>−</Text>
-        </Pressable>
-        <Text style={styles.stepValue}>{value}</Text>
-        <Pressable accessibilityLabel={`Subir ${label}`} onPress={onIncrease} style={styles.stepButton}>
-          <Text style={styles.stepText}>+</Text>
-        </Pressable>
-      </View>
-    </View>
+    <ListItem
+      headline={label}
+      supporting={hint}
+      trailing={
+        <View style={styles.stepper}>
+          <StepButton glyph="−" label={`Bajar ${label}`} onPress={onDecrease} />
+          <Text style={styles.stepValue}>{value}</Text>
+          <StepButton glyph="+" label={`Subir ${label}`} onPress={onIncrease} />
+        </View>
+      }
+    />
   );
 }
 
@@ -54,22 +67,26 @@ function Toggle({
   onValueChange: (next: boolean) => void;
 }) {
   return (
-    <View style={styles.row}>
-      <View style={styles.rowText}>
-        <Text style={styles.label}>{label}</Text>
-        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.accent }}
-        thumbColor={colors.text}
-      />
-    </View>
+    <ListItem
+      headline={label}
+      supporting={hint}
+      trailing={
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
+          thumbColor={value ? colors.onPrimary : colors.outline}
+          ios_backgroundColor={colors.surfaceContainerHighest}
+        />
+      }
+    />
   );
 }
 
-/** Panel de ajustes: sensibilidad, sonidos y avisos. */
+/**
+ * Ajustes en una hoja inferior de Material 3: asa de arrastre, título grande y
+ * las opciones agrupadas en secciones con filas de lista.
+ */
 export function SettingsSheet({
   visible,
   settings,
@@ -86,17 +103,19 @@ export function SettingsSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={styles.scrim}>
         <View style={styles.sheet}>
+          <View style={styles.handleArea}>
+            <View style={styles.handle} />
+          </View>
+
           <View style={styles.header}>
             <Text style={styles.title}>Ajustes</Text>
-            <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Cerrar ajustes">
-              <Text style={styles.closeText}>Listo</Text>
-            </Pressable>
+            <Button label="Listo" onPress={onClose} variant="text" accessibilityLabel="Cerrar ajustes" />
           </View>
 
           <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.section}>Sensibilidad</Text>
+            <Subheader>Sensibilidad</Subheader>
             <Stepper
               label="Umbral de agachado"
               hint="Grados de inclinación que disparan la alerta."
@@ -104,6 +123,7 @@ export function SettingsSheet({
               onDecrease={() => bump('thresholdDeg', -1)}
               onIncrease={() => bump('thresholdDeg', 1)}
             />
+            <Divider />
             <Stepper
               label="Margen antes del pitido"
               hint="Cuánto puedes estar agachado antes del susto."
@@ -112,13 +132,14 @@ export function SettingsSheet({
               onIncrease={() => bump('graceSeconds', 1)}
             />
 
-            <Text style={styles.section}>Sonido</Text>
+            <Subheader>Sonido</Subheader>
             <Stepper
               label="Volumen de las alertas"
               value={`${Math.round(settings.volume * 100)}%`}
               onDecrease={() => bump('volume', -1)}
               onIncrease={() => bump('volume', 1)}
             />
+            <Divider />
             <Toggle
               label="Tono EAS con auriculares"
               hint="El aviso de emergencia (853 + 960 Hz) directo a los oídos."
@@ -145,7 +166,7 @@ export function SettingsSheet({
               />
             )}
 
-            <Text style={styles.section}>Avisos</Text>
+            <Subheader>Avisos</Subheader>
             <Toggle
               label="Vibración"
               value={settings.vibrationEnabled}
@@ -164,7 +185,7 @@ export function SettingsSheet({
               onValueChange={(keepAwake) => onChange({ keepAwake })}
             />
 
-            <Text style={styles.section}>Experimento</Text>
+            <Subheader>Experimento</Subheader>
             <Toggle
               label="Sesión de control"
               hint="Mide y registra sin avisar. Es el grupo con el que comparar."
@@ -172,9 +193,15 @@ export function SettingsSheet({
               onValueChange={(controlMode) => onChange({ controlMode })}
             />
             {sessionCount > 0 ? (
-              <Pressable onPress={onClearHistory} style={styles.danger}>
-                <Text style={styles.dangerText}>Borrar las {sessionCount} sesiones guardadas</Text>
-              </Pressable>
+              <View style={styles.dangerRow}>
+                <Button
+                  label={`Borrar las ${sessionCount} sesiones guardadas`}
+                  onPress={onClearHistory}
+                  variant="outlined"
+                  color={colors.error}
+                  stretch
+                />
+              </View>
             ) : null}
           </ScrollView>
         </View>
@@ -184,65 +211,41 @@ export function SettingsSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(4,7,16,0.75)', justifyContent: 'flex-end' },
+  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    maxHeight: '88%',
-    borderTopWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceContainerLow,
+    borderTopLeftRadius: shape.extraLarge,
+    borderTopRightRadius: shape.extraLarge,
+    maxHeight: '90%',
+  },
+  handleArea: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  handle: {
+    width: 32,
+    height: 4,
+    borderRadius: shape.full,
+    backgroundColor: stateLayer(colors.onSurfaceVariant, 0.4),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingLeft: spacing.xl,
+    paddingRight: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  title: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  close: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  closeText: { color: colors.accent, fontSize: 16, fontWeight: '700' },
-  content: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xl },
-  section: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginTop: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  rowText: { flex: 1, gap: 2 },
-  label: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  hint: { color: colors.textMuted, fontSize: 12, lineHeight: 16 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  title: { ...type.headlineSmall, color: colors.onSurface },
+  content: { paddingBottom: spacing.xxl },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   stepButton: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
+    width: 40,
+    height: 40,
+    borderRadius: shape.full,
+    borderWidth: 1,
+    borderColor: colors.outline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepText: { color: colors.text, fontSize: 22, fontWeight: '700', lineHeight: 24 },
-  stepValue: { color: colors.text, fontSize: 15, fontWeight: '700', minWidth: 54, textAlign: 'center' },
-  danger: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.danger,
-  },
-  dangerText: { color: colors.danger, fontSize: 14, fontWeight: '700' },
+  stepGlyph: { ...type.titleLarge, color: colors.onSurface, lineHeight: 26 },
+  stepValue: { ...type.labelLarge, color: colors.onSurface, minWidth: 56, textAlign: 'center' },
+  dangerRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
 });

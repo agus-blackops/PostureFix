@@ -2,17 +2,17 @@
   "expo": {
     "name": "PostureFix",
     "slug": "posturefix",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "posturefix",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0B1020",
+    "backgroundColor": "#1A120D",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B1020"
+      "backgroundColor": "#1A120D"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,7 +27,7 @@
     "android": {
       "package": "com.posturefix.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0B1020",
+        "backgroundColor": "#1A120D",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -48,7 +48,7 @@
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
-          "color": "#FF7A29"
+          "color": "#FFB68F"
         }
       ]
     ]

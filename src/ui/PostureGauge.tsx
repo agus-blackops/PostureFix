@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { Phase } from '../core/postureEngine';
-import { colors, phaseColors, radius, spacing } from './theme';
+import { LinearIndicator } from './material';
+import { colors, phaseColors, shape, spacing, stateLayer, type } from './theme';
 
 interface Props {
   deviationDeg: number;
@@ -26,31 +27,33 @@ const PHASE_LABEL: Record<Phase, string> = {
 };
 
 /**
- * Indicador principal: el ángulo respecto a la postura calibrada, una barra con
- * el umbral marcado y el progreso del margen antes del pitido.
+ * Indicador principal, con la forma del progreso circular de Material 3: el
+ * ángulo respecto a la postura calibrada dentro de un anillo, el estado en
+ * texto y debajo la barra lineal con la marca del umbral.
  */
 export function PostureGauge({ deviationDeg, thresholdDeg, phase, graceProgress, controlMode = false }: Props) {
   const alerting = phase === 'scare' || phase === 'countdown' || phase === 'alarm';
   // En control no conviene ni el rótulo rojo: el usuario lo leería como aviso.
-  const color = controlMode && alerting ? colors.warn : (phaseColors[phase] ?? colors.textMuted);
+  const color = controlMode && alerting ? colors.warning : (phaseColors[phase] ?? colors.onSurfaceVariant);
   const fill = Math.min(1, deviationDeg / MAX_ANGLE);
   const thresholdMark = Math.min(1, thresholdDeg / MAX_ANGLE);
 
   return (
     <View style={styles.container}>
-      <View style={[styles.circle, { borderColor: color }]}>
-        <Text style={[styles.angle, { color }]}>{Math.round(deviationDeg)}°</Text>
-        <Text style={styles.caption}>inclinación</Text>
+      <View style={[styles.ringTrack, { borderColor: stateLayer(color, 0.18) }]}>
+        <View style={[styles.ring, { borderColor: color }]}>
+          <Text style={[styles.angle, { color }]}>{Math.round(deviationDeg)}°</Text>
+          <Text style={styles.caption}>inclinación</Text>
+        </View>
       </View>
 
-      <Text style={[styles.phase, { color }]}>
-        {controlMode && alerting ? 'Mala postura registrada (sin avisar)' : PHASE_LABEL[phase]}
-      </Text>
-
-      <View style={styles.barTrack}>
-        <View style={[styles.barFill, { width: `${fill * 100}%`, backgroundColor: color }]} />
-        <View style={[styles.threshold, { left: `${thresholdMark * 100}%` }]} />
+      <View style={[styles.phasePill, { backgroundColor: stateLayer(color, 0.16) }]}>
+        <Text style={[styles.phase, { color }]}>
+          {controlMode && alerting ? 'Mala postura registrada (sin avisar)' : PHASE_LABEL[phase]}
+        </Text>
       </View>
+
+      <LinearIndicator progress={fill} color={color} markAt={thresholdMark} />
       <View style={styles.scale}>
         <Text style={styles.scaleText}>0°</Text>
         <Text style={styles.scaleText}>umbral {Math.round(thresholdDeg)}°</Text>
@@ -58,46 +61,39 @@ export function PostureGauge({ deviationDeg, thresholdDeg, phase, graceProgress,
       </View>
 
       {graceProgress > 0 && phase === 'slouching' ? (
-        <View style={styles.graceTrack}>
-          <View style={[styles.graceFill, { width: `${Math.min(1, graceProgress) * 100}%` }]} />
-        </View>
+        <LinearIndicator progress={graceProgress} color={colors.warning} thin />
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center', gap: spacing.sm, width: '100%' },
-  circle: {
-    width: 190,
-    height: 190,
-    borderRadius: 95,
+  container: { alignItems: 'center', gap: spacing.md, width: '100%' },
+  ringTrack: {
+    width: 204,
+    height: 204,
+    borderRadius: 102,
+    borderWidth: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ring: {
+    width: 182,
+    height: 182,
+    borderRadius: 91,
     borderWidth: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceContainerLow,
   },
-  angle: { fontSize: 56, fontWeight: '800', letterSpacing: -1 },
-  caption: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  phase: { fontSize: 18, fontWeight: '700', marginTop: spacing.xs, textAlign: 'center' },
-  barTrack: {
-    width: '100%',
-    height: 12,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-    justifyContent: 'center',
+  angle: { ...type.displayLarge, fontWeight: '500' },
+  caption: { ...type.labelMedium, color: colors.onSurfaceVariant },
+  phasePill: {
+    borderRadius: shape.full,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  barFill: { height: '100%', borderRadius: radius.pill },
-  threshold: { position: 'absolute', width: 2, height: '100%', backgroundColor: colors.text, opacity: 0.7 },
+  phase: { ...type.titleMedium, textAlign: 'center' },
   scale: { width: '100%', flexDirection: 'row', justifyContent: 'space-between' },
-  scaleText: { color: colors.textMuted, fontSize: 11 },
-  graceTrack: {
-    width: '100%',
-    height: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-  },
-  graceFill: { height: '100%', backgroundColor: colors.warn },
+  scaleText: { ...type.labelSmall, color: colors.onSurfaceVariant, fontWeight: '400' },
 });

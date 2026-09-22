@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePostureMonitor } from './src/hooks/usePostureMonitor';
@@ -11,7 +11,8 @@ import { PostureGauge } from './src/ui/PostureGauge';
 import { ResultsCard } from './src/ui/ResultsCard';
 import { SettingsSheet } from './src/ui/SettingsSheet';
 import { StatusChip } from './src/ui/StatusChip';
-import { colors, radius, spacing } from './src/ui/theme';
+import { Button, Card, ExtendedFab, IconButton } from './src/ui/material';
+import { colors, spacing, type } from './src/ui/theme';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -44,17 +45,18 @@ export default function App() {
       <SafeAreaView style={styles.safe}>
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <View>
+          {/* Barra superior de Material 3: título grande y una acción a la derecha. */}
+          <View style={styles.appBar}>
+            <View style={styles.appBarText}>
               <Text style={styles.brand}>PostureFix</Text>
               <Text style={styles.tagline}>Si te agachas demasiado, te enteras.</Text>
             </View>
-            <Pressable
+            <IconButton
+              icon="⚙︎"
               onPress={() => setSettingsVisible(true)}
-              style={styles.gear}
-              accessibilityLabel="Abrir ajustes">
-              <Text style={styles.gearIcon}>⚙︎</Text>
-            </Pressable>
+              accessibilityLabel="Abrir ajustes"
+              tone={colors.onSurface}
+            />
           </View>
 
           <View style={styles.chips}>
@@ -72,14 +74,14 @@ export default function App() {
           </View>
 
           {calibrated ? null : (
-            <View style={styles.card}>
+            <Card>
               <Text style={styles.cardTitle}>Antes de empezar</Text>
               <Text style={styles.cardBody}>
                 1. Guarda el móvil en el bolsillo del pecho o del pantalón, o sujétalo al cinturón.{'\n'}
                 2. Siéntate o ponte de pie con la espalda recta.{'\n'}
                 3. Pulsa <Text style={styles.bold}>Calibrar postura</Text> y no te muevas 2 segundos.
               </Text>
-            </View>
+            </Card>
           )}
 
           {sensorMoved ? (
@@ -103,51 +105,49 @@ export default function App() {
             />
           ) : null}
 
-          <PostureGauge
-            deviationDeg={engine.deviationDeg}
-            thresholdDeg={settings.thresholdDeg}
-            phase={engine.phase}
-            graceProgress={graceProgress}
-            controlMode={settings.controlMode}
+          <Card variant="elevated" style={styles.gaugeCard}>
+            <PostureGauge
+              deviationDeg={engine.deviationDeg}
+              thresholdDeg={settings.thresholdDeg}
+              phase={engine.phase}
+              graceProgress={graceProgress}
+              controlMode={settings.controlMode}
+            />
+          </Card>
+
+          <ExtendedFab
+            label={running ? 'Parar vigilancia' : 'Empezar a vigilar'}
+            onPress={() => (running ? monitor.stop() : void monitor.start())}
+            color={running ? colors.errorContainer : colors.primary}
+            onColor={running ? colors.onErrorContainer : colors.onPrimary}
           />
 
-          <Pressable
-            onPress={() => (running ? monitor.stop() : void monitor.start())}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { backgroundColor: running ? colors.danger : colors.accent, opacity: pressed ? 0.85 : 1 },
-            ]}>
-            <Text style={styles.primaryText}>{running ? 'Parar vigilancia' : 'Empezar a vigilar'}</Text>
-          </Pressable>
-
           <View style={styles.secondaryRow}>
-            <Pressable
+            <Button
+              label={calibration === 'calibrating' ? 'Calibrando…' : 'Calibrar postura'}
               onPress={() => void monitor.calibrate()}
-              style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.85 : 1 }]}>
-              <Text style={styles.secondaryText}>
-                {calibration === 'calibrating' ? 'Calibrando…' : 'Calibrar postura'}
-              </Text>
-            </Pressable>
-            <Pressable
+              variant="tonal"
+              stretch
+            />
+            <Button
+              label="Probar alerta"
               onPress={() => void monitor.previewAlarm()}
-              style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.85 : 1 }]}>
-              <Text style={styles.secondaryText}>Probar alerta</Text>
-            </Pressable>
+              variant="outlined"
+              stretch
+            />
           </View>
 
           <View style={styles.stats}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{engine.totalAlerts}</Text>
-              <Text style={styles.statLabel}>alertas</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{formatDuration(engine.sessionBadMs)}</Text>
-              <Text style={styles.statLabel}>agachado</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{formatDuration(engine.sessionMs)}</Text>
-              <Text style={styles.statLabel}>sesión</Text>
-            </View>
+            {[
+              { value: String(engine.totalAlerts), label: 'alertas' },
+              { value: formatDuration(engine.sessionBadMs), label: 'agachado' },
+              { value: formatDuration(engine.sessionMs), label: 'sesión' },
+            ].map((stat) => (
+              <Card key={stat.label} style={styles.stat}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </Card>
+            ))}
           </View>
 
           <ResultsCard history={history} />
@@ -180,59 +180,27 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brand: { color: colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  tagline: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  gear: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+  safe: { flex: 1, backgroundColor: colors.surface },
+  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  appBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    minHeight: 64,
+    gap: spacing.md,
   },
-  gearIcon: { color: colors.text, fontSize: 20 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  cardBody: { color: colors.textMuted, fontSize: 14, lineHeight: 21 },
-  bold: { color: colors.text, fontWeight: '700' },
-  primaryButton: {
-    borderRadius: radius.md,
-    paddingVertical: spacing.md + 2,
-    alignItems: 'center',
-  },
-  primaryText: { color: '#0B1020', fontSize: 18, fontWeight: '800' },
-  secondaryRow: { flexDirection: 'row', gap: spacing.sm },
-  secondaryButton: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryText: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  stats: { flexDirection: 'row', gap: spacing.sm },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statValue: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  statLabel: { color: colors.textMuted, fontSize: 12 },
-  footer: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  appBarText: { flex: 1 },
+  brand: { ...type.headlineMedium, color: colors.onSurface, fontWeight: '500' },
+  tagline: { ...type.bodyMedium, color: colors.onSurfaceVariant },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  cardTitle: { ...type.titleMedium, color: colors.onSurface },
+  cardBody: { ...type.bodyMedium, color: colors.onSurfaceVariant },
+  bold: { color: colors.onSurface, fontWeight: '700' },
+  gaugeCard: { paddingVertical: spacing.xl },
+  secondaryRow: { flexDirection: 'row', gap: spacing.md },
+  stats: { flexDirection: 'row', gap: spacing.md },
+  stat: { flex: 1, alignItems: 'center', gap: 0, paddingVertical: spacing.lg, paddingHorizontal: spacing.sm },
+  statValue: { ...type.titleLarge, color: colors.onSurface },
+  statLabel: { ...type.labelMedium, color: colors.onSurfaceVariant, fontWeight: '400' },
+  footer: { ...type.bodySmall, color: colors.onSurfaceVariant },
 });

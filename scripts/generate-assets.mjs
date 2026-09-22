@@ -285,24 +285,26 @@ function downscale(canvas, size) {
   return out;
 }
 
-const NAVY = [11, 16, 32];
-const NAVY_TOP = [26, 38, 84];
-const ORANGE = [255, 122, 41, 1];
+// Roles de Material 3 (los mismos de src/ui/theme.ts): el fondo es `surface`
+// con un degradado hacia `surfaceContainerHighest` y el trazo, `primary`.
+const SURFACE = [26, 18, 13];
+const SURFACE_TOP = [61, 51, 45];
+const PRIMARY = [255, 182, 143, 1];
 const WHITE = [255, 255, 255, 1];
 
 function buildIcons() {
   const icon = createCanvas(1024, 1024);
-  fillBackground(icon, NAVY_TOP, NAVY);
-  drawGlyph(icon, ORANGE);
+  fillBackground(icon, SURFACE_TOP, SURFACE);
+  drawGlyph(icon, PRIMARY);
 
   const splash = createCanvas(1024, 1024);
-  drawGlyph(splash, ORANGE, 0.78);
+  drawGlyph(splash, PRIMARY, 0.78);
 
   const foreground = createCanvas(1024, 1024);
-  drawGlyph(foreground, ORANGE, 0.62);
+  drawGlyph(foreground, PRIMARY, 0.62);
 
   const background = createCanvas(1024, 1024);
-  fillBackground(background, NAVY_TOP, NAVY);
+  fillBackground(background, SURFACE_TOP, SURFACE);
 
   const monochrome = createCanvas(1024, 1024);
   drawGlyph(monochrome, WHITE, 0.62);

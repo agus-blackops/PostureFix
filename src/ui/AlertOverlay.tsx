@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text } from 'react-native';
+import { Animated, Easing, StyleSheet } from 'react-native';
 
 import { MESSAGES, type Phase } from '../core/postureEngine';
-import { colors, spacing } from './theme';
+import { colors, spacing, type } from './theme';
 
 interface Props {
   phase: Phase;
@@ -13,48 +13,63 @@ interface Props {
 }
 
 /**
- * Capa a pantalla completa que acompaña al sonido: la cuenta "1 · 2 · 3" y,
- * después, el aviso rojo parpadeante. La idea es que sea imposible ignorarla
- * aunque el móvil esté en silencio.
+ * Capa a pantalla completa que acompaña al sonido: la cuenta «1 · 2 · 3» y,
+ * después, el aviso parpadeante. Usa los roles de color de Material 3 a toda
+ * pantalla (primary para la cuenta, error para la alarma) y parpadea alternando
+ * dos colores opacos, no bajando la opacidad: así tapa la app entera y el
+ * destello se ve desde lejos aunque el móvil esté en silencio.
  */
 export function AlertOverlay({ phase, countsSpoken, controlMode = false }: Props) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  // Dos animaciones: el color no puede ir por el hilo nativo, la escala sí.
+  const flash = useRef(new Animated.Value(0)).current;
+  const beat = useRef(new Animated.Value(0)).current;
   const visible = !controlMode && (phase === 'countdown' || phase === 'alarm');
 
   useEffect(() => {
     if (!visible) {
-      pulse.setValue(0);
+      flash.setValue(0);
+      beat.setValue(0);
       return;
     }
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 380, easing: Easing.linear, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 380, easing: Easing.linear, useNativeDriver: true }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [pulse, visible]);
+    const loop = (value: Animated.Value, useNativeDriver: boolean) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(value, { toValue: 1, duration: 380, easing: Easing.linear, useNativeDriver }),
+          Animated.timing(value, { toValue: 0, duration: 380, easing: Easing.linear, useNativeDriver }),
+        ])
+      );
+    const animations = [loop(flash, false), loop(beat, true)];
+    animations.forEach((animation) => animation.start());
+    return () => animations.forEach((animation) => animation.stop());
+  }, [beat, flash, visible]);
 
   if (!visible) {
     return null;
   }
 
   const isAlarm = phase === 'alarm';
-  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: isAlarm ? [0.82, 0.98] : [0.7, 0.9] });
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+  const foreground = isAlarm ? colors.onError : colors.onPrimary;
+  const backgroundColor = flash.interpolate({
+    inputRange: [0, 1],
+    outputRange: isAlarm
+      ? [colors.error, colors.onErrorContainer]
+      : [colors.primary, colors.onPrimaryContainer],
+  });
+  const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[styles.overlay, { backgroundColor: isAlarm ? colors.danger : colors.accent, opacity }]}>
+    <Animated.View pointerEvents="none" style={[styles.overlay, { backgroundColor }]}>
       {isAlarm ? (
         <>
-          <Text style={styles.title}>¡ENDERÉZATE!</Text>
-          <Text style={styles.subtitle}>{MESSAGES.notificationBody}</Text>
+          <Animated.Text style={[styles.title, { color: foreground, transform: [{ scale }] }]}>
+            ¡ENDERÉZATE!
+          </Animated.Text>
+          <Animated.Text style={[styles.subtitle, { color: foreground }]}>
+            {MESSAGES.notificationBody}
+          </Animated.Text>
         </>
       ) : (
-        <Animated.Text style={[styles.count, { transform: [{ scale }] }]}>
+        <Animated.Text style={[styles.count, { color: foreground, transform: [{ scale }] }]}>
           {Math.max(1, countsSpoken)}
         </Animated.Text>
       )}
@@ -71,10 +86,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.md,
+    padding: spacing.xxl,
+    gap: spacing.lg,
   },
-  title: { color: '#fff', fontSize: 46, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
-  subtitle: { color: '#fff', fontSize: 18, textAlign: 'center', fontWeight: '600' },
-  count: { color: '#fff', fontSize: 190, fontWeight: '900' },
+  title: { ...type.displayMedium, fontWeight: '700', textAlign: 'center', letterSpacing: 1 },
+  subtitle: { ...type.titleMedium, textAlign: 'center', maxWidth: 420 },
+  count: { fontSize: 190, lineHeight: 210, fontWeight: '500' },
 });

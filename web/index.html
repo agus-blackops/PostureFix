@@ -3,171 +3,405 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#1a120d" />
     <title>PostureFix · versión webcam</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Ccircle cx='12' cy='10' r='3.4' fill='%23ff7a29'/%3E%3Cpath d='M11.6 14 C9.5 18 12 21 15.5 22.4' stroke='%23ff7a29' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M15 22.6 H23' stroke='%23ff7a29' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a120d'/%3E%3Ccircle cx='12' cy='10' r='3.4' fill='%23ffb68f'/%3E%3Cpath d='M11.6 14 C9.5 18 12 21 15.5 22.4' stroke='%23ffb68f' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M15 22.6 H23' stroke='%23ffb68f' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
     <style>
+      /* ---------------------------------------------------------------------
+         Tokens de Material Design 3 (tema oscuro), los mismos roles y valores
+         que usa la app de móvil en src/ui/theme.ts.
+         --------------------------------------------------------------------- */
       :root {
-        --bg: #0b1020;
-        --surface: #151b33;
-        --surface-alt: #1e2646;
-        --border: #2a3358;
-        --text: #f2f5ff;
-        --muted: #98a2c8;
-        --accent: #ff7a29;
-        --good: #2ed47a;
-        --danger: #ff3b30;
+        --primary: #ffb68f;
+        --on-primary: #542100;
+        --primary-container: #78310a;
+        --on-primary-container: #ffdbc8;
+
+        --secondary-container: #5d4130;
+        --on-secondary-container: #ffdbc8;
+
+        --error: #ffb4ab;
+        --on-error: #690005;
+        --error-container: #93000a;
+        --on-error-container: #ffdad6;
+
+        --success: #6fdb94;
+        --warning: #f5bd4b;
+        --warning-container: #5d4200;
+        --on-warning-container: #ffdea6;
+
+        --surface: #1a120d;
+        --on-surface: #f1dfd6;
+        --on-surface-variant: #d8c2b6;
+        --surface-container-low: #221a15;
+        --surface-container: #271e19;
+        --surface-container-high: #322823;
+        --surface-container-highest: #3d332d;
+
+        --outline: #a08d82;
+        --outline-variant: #53433b;
+
+        /* Formas y elevación de M3. */
+        --shape-s: 8px;
+        --shape-m: 12px;
+        --shape-l: 16px;
+        --shape-xl: 28px;
+        --shape-full: 999px;
+        --elev-1: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.15);
+        --elev-2: 0 2px 6px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.15);
+        --elev-3: 0 4px 10px rgba(0, 0, 0, 0.34), 0 2px 3px rgba(0, 0, 0, 0.18);
       }
+
       * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+
       body {
         margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      }
-      main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
-      header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-      h1 { font-size: 28px; margin: 0; letter-spacing: -0.5px; }
-      .tagline { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
-      .version { font-variant-numeric: tabular-nums; opacity: 0.75; }
-      .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
-      @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
-      .card {
         background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 16px;
+        color: var(--on-surface);
+        font: 400 14px/20px Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+        letter-spacing: 0.25px;
       }
-      .stage { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+
+      /* Indicador de foco de M3: visible y del color del rol primary. */
+      :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: var(--shape-s); }
+
+      /* ------------------------------------------------- barra superior --- */
+      .top-app-bar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 64px;
+        padding: 12px 24px;
+        background: var(--surface-container);
+        box-shadow: var(--elev-2);
+      }
+      .top-app-bar h1 { font: 500 22px/28px Roboto, system-ui, sans-serif; margin: 0; letter-spacing: 0; }
+      .tagline { color: var(--on-surface-variant); font-size: 14px; margin: 2px 0 0; }
+      .version {
+        font-variant-numeric: tabular-nums;
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: var(--shape-s);
+        background: var(--surface-container-highest);
+        color: var(--on-surface-variant);
+        font-size: 12px;
+      }
+
+      main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 56px; }
+      .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+      /* --------------------------------------------------------- tarjetas --- */
+      .card {
+        background: var(--surface-container-low);
+        border-radius: var(--shape-l);
+        padding: 16px;
+        box-shadow: var(--elev-1);
+      }
+      .card.filled { background: var(--surface-container-highest); box-shadow: none; }
+      .card + .card, .layout + .card { margin-top: 16px; }
+
+      .stage { position: relative; border-radius: var(--shape-m); overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
       /* Espejo: te ves como en un espejo, que es lo natural. */
       .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
       .stage video { object-fit: cover; }
-      #status { color: var(--muted); font-size: 13px; margin: 10px 2px 0; min-height: 2.5em; }
-      .gauge { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-      #angle { font-size: 64px; font-weight: 800; line-height: 1; color: var(--good); }
-      .caption { color: var(--muted); font-size: 13px; margin-top: -4px; }
-      #phase { font-size: 18px; font-weight: 700; color: var(--good); }
-      #cause { color: var(--muted); font-size: 14px; min-height: 1.4em; }
-      .track { position: relative; width: 100%; height: 12px; border-radius: 999px; background: var(--surface-alt); overflow: hidden; }
-      .track#grace-track { height: 6px; }
-      #bar, #grace { height: 100%; width: 0; border-radius: 999px; background: var(--good); transition: width 120ms linear; }
-      #grace { background: #ffc24b; }
-      #threshold-mark { position: absolute; top: 0; width: 2px; height: 100%; background: var(--text); opacity: 0.7; }
-      .scale { display: flex; justify-content: space-between; width: 100%; color: var(--muted); font-size: 11px; }
-      .buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-      .row { display: flex; gap: 10px; }
-      button {
-        flex: 1; cursor: pointer; font: inherit; font-weight: 700;
-        padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border);
-        background: var(--surface-alt); color: var(--text);
+      #status { color: var(--on-surface-variant); font-size: 13px; margin: 12px 4px 0; min-height: 2.5em; }
+
+      /* ---------------------------------------------------------- medidor --- */
+      .gauge { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--success); }
+      .ring {
+        width: 188px;
+        height: 188px;
+        border-radius: 50%;
+        border: 10px solid currentColor;
+        background: var(--surface-container);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: border-color 160ms ease;
       }
-      button:hover:enabled { border-color: var(--accent); }
-      button:disabled { opacity: 0.6; cursor: default; }
-      #start { background: var(--accent); color: #0b1020; border-color: transparent; font-size: 17px; }
-      #start.stop { background: var(--danger); color: #fff; }
-      .stats { display: flex; gap: 10px; margin-top: 16px; }
-      .stat { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
-      .stat b { display: block; font-size: 20px; }
-      .stat span { color: var(--muted); font-size: 12px; }
-      h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 20px 0 8px; }
-      .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
-      .setting label { flex: 1; }
-      .setting small { display: block; color: var(--muted); font-weight: 400; }
-      .setting input[type="range"] { width: 150px; accent-color: var(--accent); }
-      .setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
-      .setting output { color: var(--muted); font-size: 13px; min-width: 56px; text-align: right; }
-      footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+      #angle { font: 500 57px/64px Roboto, system-ui, sans-serif; letter-spacing: -0.25px; color: inherit; }
+      .caption { color: var(--on-surface-variant); font-size: 12px; letter-spacing: 0.5px; }
+      /* El estado va en una píldora tonal, como los chips de M3. */
+      #phase {
+        font: 600 16px/24px Roboto, system-ui, sans-serif;
+        color: inherit;
+        background: var(--surface-container-highest);
+        background: color-mix(in srgb, currentColor 16%, transparent);
+        border-radius: var(--shape-full);
+        padding: 6px 16px;
+        transition: color 160ms ease;
+      }
+      #cause { color: var(--on-surface-variant); font-size: 14px; min-height: 1.4em; text-align: center; }
+
+      .track { position: relative; width: 100%; height: 8px; border-radius: var(--shape-full); background: var(--surface-container-highest); overflow: hidden; }
+      .track#grace-track { height: 4px; }
+      #bar, #grace { height: 100%; width: 0; border-radius: var(--shape-full); background: currentColor; transition: width 120ms linear; }
+      #grace { background: var(--warning); }
+      /* «Stop indicator» de M3: la marca del umbral sobre la pista. */
+      #threshold-mark { position: absolute; top: 0; width: 4px; height: 100%; border-radius: var(--shape-full); background: var(--on-surface); }
+      .scale { display: flex; justify-content: space-between; width: 100%; color: var(--on-surface-variant); font-size: 11px; letter-spacing: 0.5px; }
+
+      /* ---------------------------------------------------------- botones --- */
+      button {
+        position: relative;
+        cursor: pointer;
+        font: 600 14px/20px Roboto, system-ui, sans-serif;
+        letter-spacing: 0.1px;
+        min-height: 40px;
+        padding: 10px 24px;
+        border-radius: var(--shape-full);
+        border: 1px solid var(--outline);
+        background: transparent;
+        color: var(--primary);
+        overflow: hidden;
+        transition: background-color 120ms ease, box-shadow 120ms ease;
+      }
+      /* Capa de estado de M3: 8 % al pasar por encima, 12 % al pulsar. */
+      button::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: currentColor;
+        opacity: 0;
+        transition: opacity 120ms ease;
+        pointer-events: none;
+      }
+      button:hover:enabled::after { opacity: 0.08; }
+      button:active:enabled::after { opacity: 0.12; }
+      button:disabled { opacity: 0.38; cursor: default; border-color: transparent; background: rgba(241, 223, 214, 0.12); color: var(--on-surface); }
+      button.tonal { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; }
+
+      .buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+      .row { display: flex; gap: 12px; }
+      .row button { flex: 1; }
+
+      /* El botón principal es un FAB extendido: 56 dp y esquina de 16 dp. */
+      #start {
+        min-height: 56px;
+        border-radius: var(--shape-l);
+        border-color: transparent;
+        background: var(--primary);
+        color: var(--on-primary);
+        font: 600 16px/24px Roboto, system-ui, sans-serif;
+        letter-spacing: 0.15px;
+        box-shadow: var(--elev-3);
+      }
+      #start.stop { background: var(--error-container); color: var(--on-error-container); }
+
+      /* ------------------------------------------------------- estadística --- */
+      .stats { display: flex; gap: 12px; margin-top: 20px; }
+      .stat { flex: 1; background: var(--surface-container-highest); border-radius: var(--shape-l); padding: 16px 8px; text-align: center; }
+      .stat b { display: block; font: 500 24px/32px Roboto, system-ui, sans-serif; }
+      .stat span { color: var(--on-surface-variant); font-size: 12px; letter-spacing: 0.5px; }
+
+      /* ---------------------------------------------------------- secciones --- */
+      h2 {
+        font: 600 14px/20px Roboto, system-ui, sans-serif;
+        letter-spacing: 0.1px;
+        color: var(--primary);
+        margin: 24px 0 4px;
+      }
+
+      /* Filas de lista de M3: texto principal, texto de apoyo y control al final. */
+      .setting {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 56px;
+        padding: 12px 4px;
+        border-bottom: 1px solid var(--outline-variant);
+      }
+      .setting:last-of-type { border-bottom: none; }
+      .setting label { flex: 1; font-size: 16px; letter-spacing: 0.5px; cursor: pointer; }
+      .setting small { display: block; color: var(--on-surface-variant); font-size: 14px; font-weight: 400; letter-spacing: 0.25px; margin-top: 2px; }
+      .setting output { color: var(--on-surface-variant); font-size: 14px; min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+      .setting button { min-height: 40px; padding: 8px 20px; flex: 0 0 auto; }
+      .setting button.activo { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; }
+
+      /* Deslizador de M3: pista fina, pulgar grande. */
+      .setting input[type="range"] {
+        width: 160px;
+        height: 20px;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+      }
+      .setting input[type="range"]::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: var(--shape-full);
+        background: var(--surface-container-highest);
+      }
+      .setting input[type="range"]::-moz-range-track { height: 4px; border-radius: var(--shape-full); background: var(--surface-container-highest); }
+      .setting input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        margin-top: -7px;
+        border-radius: 50%;
+        background: var(--primary);
+        box-shadow: var(--elev-1);
+      }
+      .setting input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%; background: var(--primary); }
+
+      /* Interruptor de M3 a partir de un checkbox: pista de 52×32 y pulgar que
+         crece al encenderse. */
+      input[type="checkbox"] {
+        appearance: none;
+        flex: 0 0 auto;
+        position: relative;
+        width: 52px;
+        height: 32px;
+        margin: 0;
+        border-radius: var(--shape-full);
+        border: 2px solid var(--outline);
+        background: var(--surface-container-highest);
+        cursor: pointer;
+        transition: background-color 120ms ease, border-color 120ms ease;
+      }
+      input[type="checkbox"]::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 4px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--outline);
+        transform: translateY(-50%);
+        transition: transform 120ms ease, width 120ms ease, height 120ms ease, background-color 120ms ease;
+      }
+      input[type="checkbox"]:checked { background: var(--primary); border-color: var(--primary); }
+      input[type="checkbox"]:checked::after {
+        width: 24px;
+        height: 24px;
+        background: var(--on-primary);
+        transform: translate(20px, -50%);
+      }
+
+      /* Campo de selección con el contorno de M3. */
+      .setting select {
+        font: inherit;
+        font-size: 14px;
+        padding: 10px 12px;
+        border-radius: var(--shape-s);
+        border: 1px solid var(--outline);
+        background: var(--surface-container);
+        color: var(--on-surface);
+        cursor: pointer;
+      }
+
+      /* ------------------------------------------------------------ avisos --- */
       .aviso {
         display: flex;
         flex-direction: column;
         gap: 6px;
-        margin-top: 10px;
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid var(--warn, #ffc24b);
-        background: var(--surface-alt);
-        font-size: 13px;
+        margin-top: 12px;
+        padding: 16px;
+        border-radius: var(--shape-l);
+        background: var(--warning-container);
+        color: var(--on-warning-container);
+        font-size: 14px;
       }
-      .aviso.grave { border-color: var(--danger); }
-      .aviso b { color: var(--warn, #ffc24b); }
-      .aviso.grave b { color: var(--danger); }
-      .aviso-acciones { display: flex; gap: 8px; margin-top: 4px; }
-      .aviso-acciones button { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; }
-      .setting select, .setting button {
-        font: inherit;
-        padding: 8px 12px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: var(--surface-alt);
-        color: var(--text);
-        cursor: pointer;
-      }
-      .setting button.activo { border-color: var(--accent); color: var(--accent); }
+      .aviso.grave { background: var(--error-container); color: var(--on-error-container); }
+      .aviso b { font: 600 16px/24px Roboto, system-ui, sans-serif; }
+      .aviso-acciones { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+      .aviso-acciones button { flex: 0 0 auto; padding: 8px 16px; border-color: transparent; color: inherit; }
 
+      /* Modo control: tarjeta seleccionable con contorno, como una card de M3. */
       .control-mode {
         display: flex;
-        gap: 10px;
-        align-items: flex-start;
-        margin-top: 14px;
-        padding: 12px;
-        border: 1px dashed var(--border);
-        border-radius: 12px;
+        gap: 16px;
+        align-items: center;
+        margin-top: 16px;
+        padding: 12px 16px;
+        border: 1px solid var(--outline-variant);
+        border-radius: var(--shape-m);
         cursor: pointer;
       }
-      .control-mode small { display: block; color: var(--muted); font-weight: 400; }
-      .control-mode input { width: 20px; height: 20px; accent-color: var(--accent); }
-      .hint { color: var(--muted); font-size: 13px; }
-      .comparativa-fila { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-      .comparativa-fila .etiqueta { width: 160px; font-size: 13px; color: var(--muted); }
-      .comparativa-fila .barra { flex: 1; height: 22px; background: var(--surface-alt); border-radius: 6px; overflow: hidden; }
-      .comparativa-fila .barra i { display: block; height: 100%; width: 0; background: var(--muted); transition: width 200ms; }
-      #barra-control i, #barra-control { background: var(--warn, #ffc24b); }
-      #barra-avisos { background: var(--good); }
-      .comparativa-fila output { width: 92px; text-align: right; font-weight: 700; }
+      .control-mode:hover { background: rgba(241, 223, 214, 0.05); }
+      .control-mode b { font-size: 16px; font-weight: 600; }
+      .control-mode small { display: block; color: var(--on-surface-variant); font-weight: 400; margin-top: 2px; }
+
+      /* -------------------------------------------------------- resultados --- */
+      .hint { color: var(--on-surface-variant); font-size: 14px; }
+      .comparativa-fila { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+      .comparativa-fila .etiqueta { width: 160px; font-size: 12px; color: var(--on-surface-variant); letter-spacing: 0.4px; }
+      .comparativa-fila .barra { flex: 1; height: 8px; background: var(--surface-container-highest); border-radius: var(--shape-full); overflow: hidden; }
+      .comparativa-fila .barra i { display: block; height: 100%; width: 0; border-radius: var(--shape-full); transition: width 200ms ease; }
+      #barra-control { background: var(--warning); }
+      #barra-avisos { background: var(--success); }
+      .comparativa-fila output { width: 92px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
       #conclusion { font-size: 14px; margin: 4px 0 0; }
+
       /* Cada sesión es una columna de altura completa; dentro, la barra crece
          desde abajo. El contenedor necesita altura definida o los porcentajes
          de las barras no resuelven contra nada. */
-      .sesiones { display: flex; align-items: stretch; gap: 4px; height: 90px; margin-top: 16px; }
+      .sesiones { display: flex; align-items: stretch; gap: 4px; height: 90px; margin-top: 20px; }
+      .sesiones:empty { height: 0; margin-top: 0; }
       .sesiones .sesion {
         flex: 1;
         max-width: 26px;
-        background: var(--surface-alt);
-        border-radius: 4px 4px 0 0;
+        background: var(--surface-container-highest);
+        border-radius: var(--shape-s) var(--shape-s) 0 0;
         display: flex;
         align-items: flex-end;
       }
-      .sesiones .sesion i { display: block; width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
-      .leyenda { display: flex; gap: 16px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+      .sesiones .sesion i { display: block; width: 100%; border-radius: var(--shape-s) var(--shape-s) 0 0; min-height: 2px; }
+      .sesiones .sesion.control i { background: var(--warning); }
+      .sesiones .sesion.avisos i { background: var(--success); }
+      .leyenda { display: flex; flex-wrap: wrap; gap: 16px; color: var(--on-surface-variant); font-size: 12px; margin-top: 12px; }
       .leyenda span { display: flex; align-items: center; gap: 6px; }
       .leyenda b { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-      .sesiones .sesion.control i { background: #ffc24b; }
-      .sesiones .sesion.avisos i { background: var(--good); }
+
+      footer { color: var(--on-surface-variant); font-size: 12px; margin-top: 24px; line-height: 16px; }
+
+      /* ------------------------------------------------- alerta a pantalla --- */
       .alert {
         position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 16px; text-align: center; padding: 32px; color: #fff; z-index: 10; pointer-events: none;
-        animation: pulse 0.76s infinite;
+        gap: 16px; text-align: center; padding: 32px; z-index: 10; pointer-events: none;
       }
       .alert.hidden { display: none; }
-      .alert.countdown { background: var(--accent); }
-      .alert.countdown #alert-text { font-size: 25vh; font-weight: 900; }
-      .alert.alarm { background: var(--danger); }
-      .alert.alarm #alert-text { font-size: clamp(38px, 8vw, 72px); font-weight: 900; letter-spacing: 1px; }
-      #alert-body { font-size: 18px; font-weight: 600; max-width: 30ch; }
-      @keyframes pulse { 0%, 100% { opacity: 0.86; } 50% { opacity: 1; } }
+      /* El parpadeo alterna dos colores opacos en vez de bajar la opacidad: así
+         la pantalla tapa del todo la app y el destello se ve a metros. */
+      .alert.countdown { background: var(--primary); color: var(--on-primary); animation: flash-cuenta 0.76s infinite; }
+      .alert.countdown #alert-text { font-size: 25vh; font-weight: 500; line-height: 1; }
+      .alert.alarm { background: var(--error); color: var(--on-error); animation: flash-alarma 0.76s infinite; }
+      .alert.alarm #alert-text { font-size: clamp(38px, 8vw, 72px); font-weight: 700; letter-spacing: 1px; }
+      /* Sin altura de línea propia, el titular hereda los 20 px del body y se
+         come la línea de abajo. */
+      #alert-text { line-height: 1.05; }
+      #alert-body { font: 600 18px/26px Roboto, system-ui, sans-serif; max-width: 32ch; }
+      @keyframes flash-alarma { 0%, 100% { background-color: var(--error); } 50% { background-color: var(--on-error-container); } }
+      @keyframes flash-cuenta { 0%, 100% { background-color: var(--primary); } 50% { background-color: var(--on-primary-container); } }
+
+      /* Quien pide menos movimiento se queda con el color, sin parpadeo. */
+      @media (prefers-reduced-motion: reduce) {
+        .alert { animation: none !important; }
+        * { transition-duration: 1ms !important; }
+      }
     </style>
   </head>
   <body>
-    <main>
-      <header>
-        <div>
-          <h1>PostureFix</h1>
-          <p class="tagline">
-            Versión para portátil: la webcam te vigila la espalda.
-            <span id="version" class="version"></span>
-          </p>
-        </div>
-      </header>
+    <header class="top-app-bar">
+      <div>
+        <h1>PostureFix</h1>
+        <p class="tagline">
+          Versión para portátil: la webcam te vigila la espalda.
+        </p>
+      </div>
+      <span id="version" class="version"></span>
+    </header>
 
+    <main>
       <div class="layout">
         <section class="card">
           <div class="stage">
@@ -187,9 +421,11 @@
         </section>
 
         <section class="card">
-          <div class="gauge">
-            <div id="angle">0°</div>
-            <div class="caption">desviación de tu postura calibrada</div>
+          <div class="gauge" id="gauge">
+            <div class="ring">
+              <div id="angle">0°</div>
+              <div class="caption">desviación</div>
+            </div>
             <div id="phase">En pausa</div>
             <div id="cause"></div>
             <div class="track"><div id="bar"></div><div id="threshold-mark"></div></div>
@@ -198,17 +434,17 @@
           </div>
 
           <label class="control-mode" for="set-control">
-            <input type="checkbox" id="set-control" />
             <span>
               <b>Sesión de control</b>
               <small>Mide y registra sin avisar. Es el grupo de comparación del experimento.</small>
             </span>
+            <input type="checkbox" id="set-control" />
           </label>
 
           <div class="buttons">
             <button id="start">Empezar a vigilar</button>
             <div class="row">
-              <button id="calibrate">Calibrar postura</button>
+              <button id="calibrate" class="tonal">Calibrar postura</button>
               <button id="test">Probar alerta</button>
             </div>
           </div>
@@ -221,7 +457,7 @@
         </section>
       </div>
 
-      <section class="card" id="historial" style="margin-top: 16px">
+      <section class="card" id="historial">
         <h2 style="margin-top: 0">Historial y resultados</h2>
         <p id="historial-vacio" class="hint">
           Aún no hay sesiones guardadas. Haz una <b>sesión de control</b> y otra normal de al menos
@@ -244,18 +480,18 @@
 
         <div id="sesiones" class="sesiones"></div>
         <div class="leyenda" id="leyenda" hidden>
-          <span><b style="background: #ffc24b"></b> control (sin avisos)</span>
-          <span><b style="background: #2ed47a"></b> con avisos</span>
+          <span><b style="background: #f5bd4b"></b> control (sin avisos)</span>
+          <span><b style="background: #6fdb94"></b> con avisos</span>
           <span>altura = % del tiempo encorvado</span>
         </div>
 
-        <div class="row" style="margin-top: 12px">
-          <button id="csv">Descargar CSV</button>
+        <div class="row" style="margin-top: 16px">
+          <button id="csv" class="tonal">Descargar CSV</button>
           <button id="borrar">Borrar historial</button>
         </div>
       </section>
 
-      <section class="card" style="margin-top: 16px">
+      <section class="card">
         <h2 style="margin-top: 0">Sensibilidad</h2>
         <div class="setting">
           <label for="set-threshold">Umbral de mala postura<small>Cuánto te puedes desviar de la postura calibrada.</small></label>

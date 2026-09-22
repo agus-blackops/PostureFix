@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { compareModes, type SessionRecord } from '../core/sessionLog';
-import { colors, radius, spacing } from './theme';
+import { Card, LinearIndicator } from './material';
+import { colors, spacing, type } from './theme';
 
 interface Props {
   history: SessionRecord[];
@@ -11,7 +12,8 @@ const percent = (ratio: number) => `${(ratio * 100).toFixed(1)} %`;
 
 /**
  * Resultados del experimento: cuánto tiempo se pasa encorvado con avisos frente
- * a las sesiones de control, que miden sin avisar.
+ * a las sesiones de control, que miden sin avisar. Va en una tarjeta elevada de
+ * Material 3 con dos indicadores lineales comparables de un vistazo.
  */
 export function ResultsCard({ history }: Props) {
   if (history.length === 0) {
@@ -20,19 +22,19 @@ export function ResultsCard({ history }: Props) {
 
   const { control, withAlerts, improvement } = compareModes(history);
   const rows = [
-    { label: 'Sin avisos (control)', summary: control, color: colors.warn },
-    { label: 'Con avisos', summary: withAlerts, color: colors.good },
+    { label: 'Sin avisos (control)', summary: control, color: colors.warning },
+    { label: 'Con avisos', summary: withAlerts, color: colors.success },
   ];
 
   return (
-    <View style={styles.card}>
+    <Card variant="elevated">
       <Text style={styles.title}>Resultados</Text>
 
       {rows.map(({ label, summary, color }) => (
         <View key={label} style={styles.row}>
           <Text style={styles.label}>{label}</Text>
-          <View style={styles.track}>
-            <View style={[styles.fill, { width: `${Math.min(100, summary.badRatio * 100)}%`, backgroundColor: color }]} />
+          <View style={styles.bar}>
+            <LinearIndicator progress={summary.badRatio} color={color} />
           </View>
           <Text style={styles.value}>{summary.sessions > 0 ? percent(summary.badRatio) : '—'}</Text>
         </View>
@@ -48,25 +50,16 @@ export function ResultsCard({ history }: Props) {
       <Text style={styles.footnote}>
         {history.length} sesión(es) guardada(s) · la barra es el porcentaje del tiempo encorvado
       </Text>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  label: { color: colors.textMuted, fontSize: 12, width: 110 },
-  track: { flex: 1, height: 16, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: radius.sm },
-  value: { color: colors.text, fontSize: 13, fontWeight: '700', width: 58, textAlign: 'right' },
-  conclusion: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  footnote: { color: colors.textMuted, fontSize: 11 },
+  title: { ...type.titleLarge, color: colors.onSurface },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  label: { ...type.bodySmall, color: colors.onSurfaceVariant, width: 112 },
+  bar: { flex: 1 },
+  value: { ...type.labelLarge, color: colors.onSurface, width: 58, textAlign: 'right' },
+  conclusion: { ...type.bodyMedium, color: colors.onSurface, marginTop: spacing.xs },
+  footnote: { ...type.bodySmall, color: colors.onSurfaceVariant },
 });

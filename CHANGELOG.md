@@ -1,5 +1,38 @@
 # Cambios
 
+## 1.1.0
+
+Versión de aspecto: la app pasa a Material Design 3 de arriba abajo, con los
+mismos avisos y la misma forma de medir.
+
+- **Un solo sistema de diseño en los tres sitios.** `src/ui/theme.ts` define los
+  roles de color de M3 (primary / onPrimary / primaryContainer…), la escala de
+  formas, la rejilla de 4 dp, los niveles de elevación y la escala tipográfica;
+  la hoja de estilos de la versión de portátil repite los mismos valores como
+  variables CSS. Antes cada pantalla elegía su color a mano, así que móvil y
+  portátil se parecían de lejos y no de cerca.
+- **Componentes de verdad, no cajas sueltas** (`src/ui/material.tsx`): botones
+  relleno / tonal / contorno / texto con su capa de estado al pulsar, FAB
+  extendido, tarjetas rellenas y elevadas, chips de asistencia, filas de lista,
+  separadores e indicador lineal con la marca del umbral.
+- **Paleta derivada del naranja de siempre.** El color fuente (#FF7A29) genera
+  el tema oscuro: fondo cálido, primary claro para lo importante y las familias
+  propias `success` y `warning` para «postura correcta» y «te estás agachando»,
+  que M3 no define.
+- **Ajustes en hoja inferior**, con asa de arrastre, secciones y filas de lista:
+  cada opción tiene su explicación debajo y el control a la derecha.
+- **La alerta a pantalla completa ya no es translúcida.** Parpadeaba bajando la
+  opacidad, así que se transparentaba la app y perdía fuerza; ahora alterna dos
+  colores opacos y tapa la pantalla entera.
+- **En pausa el medidor va en gris**, no en verde: el verde significa «postura
+  correcta» y en pausa no se está midiendo nada.
+- **Arreglos de la versión de portátil**: los avisos y la leyenda respetan el
+  atributo `hidden` (antes el `display: flex` lo pisaba y el aviso de sensor
+  movido se veía siempre), la tira de sesiones no reserva hueco cuando está
+  vacía y el titular de la alarma ya no se solapa con el texto de debajo.
+- **Detalles de accesibilidad**: foco visible en todos los controles y respeto a
+  `prefers-reduced-motion`, que apaga el parpadeo.
+
 ## 1.0.2
 
 Versión centrada en medir mejor: los mismos avisos, pero sobre un número más

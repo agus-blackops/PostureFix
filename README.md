@@ -139,9 +139,9 @@ sección *Artifacts* (caducan a los 90 días y piden sesión):
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-portable-1.0.2.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-1.0.2.exe` | Windows con instalador y acceso directo |
-| `PostureFix-1.0.2.AppImage` | Linux |
+| `PostureFix-portable-1.1.0.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-1.1.0.exe` | Windows con instalador y acceso directo |
+| `PostureFix-1.1.0.AppImage` | Linux |
 
 ### Construirla uno mismo
 
@@ -224,7 +224,7 @@ sonidos y los iconos que se versionan en `assets/`:
 
 ## Versiones
 
-`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.0.2**, la
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.1.0**, la
 que va a la feria.
 
 ## Panel para la feria
@@ -244,7 +244,9 @@ src/core/settings.ts         ajustes persistidos en AsyncStorage
 src/core/sessionLog.ts       historial de sesiones y comparación (con tests)
 src/services/               audio, voz, vibración y notificaciones
 src/hooks/usePostureMonitor  une sensor + máquina de estados + avisos
-src/ui/                      componentes de interfaz
+src/ui/theme.ts              tokens de Material 3: color, forma, elevación y tipografía
+src/ui/material.tsx          componentes de Material 3 (botones, tarjetas, chips, listas)
+src/ui/                      el resto de la interfaz
 modules/headphones/          módulo nativo de detección de auriculares (Kotlin + Swift)
 scripts/generate-assets.mjs  generador de sonidos e iconos
 web/                         versión para portátil: webcam + MediaPipe Pose

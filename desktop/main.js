@@ -59,7 +59,7 @@ function createWindow() {
     height: 820,
     minWidth: 720,
     minHeight: 640,
-    backgroundColor: '#0b1020',
+    backgroundColor: '#1a120d',
     icon: ICON,
     title: 'PostureFix',
     webPreferences: {
