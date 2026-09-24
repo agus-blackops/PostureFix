@@ -30,6 +30,7 @@ import {
   repositionStep,
   type RepositionState,
 } from '../../src/core/reposition';
+import { formatDegrees, formatDuration, formatPercent } from '../../src/core/format';
 import { WebAlerts } from './alerts';
 import { createPoseLandmarker, startCamera, stopCamera, type ModelQuality } from './detector';
 import {
@@ -84,16 +85,21 @@ const PHASE_LABEL: Record<Phase, string> = {
 };
 
 /**
- * Roles de color de Material 3 que también usa la hoja de estilos. Se repiten
- * aquí porque el lienzo y los estilos en línea necesitan el valor, no la
- * variable CSS.
+ * Colores de estado que también usa la hoja de estilos (los del sistema de
+ * Apple en modo oscuro). Se repiten aquí porque el lienzo y los estilos en
+ * línea necesitan el valor, no la variable CSS.
  */
 const ROLE = {
-  neutral: '#D8C2B6',
-  success: '#6FDB94',
-  warning: '#F5BD4B',
-  error: '#FFB4AB',
+  neutral: '#A39890',
+  success: '#30D158',
+  warning: '#FFD60A',
+  error: '#FF453A',
+  tint: '#FF7A29',
 } as const;
+
+/** Radio del anillo del medidor en el SVG, para calcular su perímetro. */
+const RING_RADIUS = 96;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -107,10 +113,16 @@ const ui = {
   angle: el('angle'),
   phase: el('phase'),
   cause: el('cause'),
-  bar: el('bar'),
-  threshold: el('threshold-mark'),
+  ringProgress: el<HTMLElement>('ring-progress'),
+  ringMark: el<HTMLElement>('ring-mark'),
   grace: el('grace'),
+  graceRow: el('grace-row'),
+  graceText: el('grace-text'),
+  thresholdHint: el('threshold-hint'),
   gauge: el('gauge'),
+  stageEmpty: el('stage-empty'),
+  nav: el('nav'),
+  largeTitle: el('large-title'),
   start: el<HTMLButtonElement>('start'),
   calibrate: el<HTMLButtonElement>('calibrate'),
   test: el<HTMLButtonElement>('test'),
@@ -147,9 +159,10 @@ const ui = {
     easAlways: el<HTMLInputElement>('set-eas'),
     voiceEnabled: el<HTMLInputElement>('set-voice'),
     notificationsEnabled: el<HTMLInputElement>('set-notify'),
-    modelQuality: el<HTMLSelectElement>('set-modelo'),
+    modelFull: el<HTMLInputElement>('modelo-full'),
+    modelLite: el<HTMLInputElement>('modelo-lite'),
   },
-  fairMode: el<HTMLButtonElement>('set-feria'),
+  fairMode: el<HTMLInputElement>('set-feria'),
   values: {
     thresholdDeg: el('val-threshold'),
     graceSeconds: el('val-grace'),
@@ -199,11 +212,6 @@ function alarmSound(): AlarmSound {
 
 function setStatus(message: string): void {
   ui.status.textContent = message;
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  return seconds >= 60 ? `${Math.floor(seconds / 60)} min ${seconds % 60}s` : `${seconds}s`;
 }
 
 // --------------------------------------------------------------- acciones ---
@@ -343,7 +351,7 @@ function drawOverlay(landmarks: Landmark[] | null): void {
   const ears = [point(POSE.leftEar), point(POSE.rightEar)];
 
   context.strokeStyle =
-    engine.phase === 'alarm' ? ROLE.error : cause === 'none' ? ROLE.success : ROLE.warning;
+    engine.phase === 'alarm' && !settings.controlMode ? ROLE.error : cause === 'none' ? ROLE.success : ROLE.warning;
   context.lineWidth = 4;
   context.lineCap = 'round';
 
@@ -373,7 +381,7 @@ function drawOverlay(landmarks: Landmark[] | null): void {
 
 function render(): void {
   const deviation = engine.deviationDeg;
-  ui.angle.textContent = `${Math.round(deviation)}°`;
+  ui.angle.textContent = formatDegrees(deviation);
   ui.phase.textContent =
     settings.controlMode && isAlerting(engine.phase)
       ? 'Mala postura registrada (sin avisar)'
@@ -387,20 +395,43 @@ function render(): void {
         : (settings.controlMode ? 'Sesión de control · ' : '') +
           CAUSE_LABEL[deviation >= settings.thresholdDeg ? cause : 'none'];
 
+  // Los mismos colores por fase que el móvil (phaseColors en src/ui/theme.ts).
+  // En una sesión de control nada pasa del amarillo: no se está avisando.
+  const warned = !settings.controlMode;
   const color =
-    engine.phase === 'alarm' && !settings.controlMode
+    engine.phase === 'alarm' && warned
       ? ROLE.error
-      : engine.phase === 'idle'
-        ? ROLE.neutral
-        : engine.phase === 'ok' || engine.phase === 'cooldown'
-          ? ROLE.success
-          : ROLE.warning;
-  // Basta teñir el contenedor: anillo, cifra, píldora de estado y barra lo
-  // heredan por currentColor.
+      : (engine.phase === 'scare' || engine.phase === 'countdown') && warned
+        ? ROLE.tint
+        : engine.phase === 'idle'
+          ? ROLE.neutral
+          : engine.phase === 'ok' || engine.phase === 'cooldown'
+            ? ROLE.success
+            : ROLE.warning;
+  // Basta teñir el contenedor: anillo y píldora de estado lo heredan por
+  // currentColor. El resplandor del fondo sigue al mismo color.
   ui.gauge.style.color = color;
-  ui.bar.style.width = cssPercent(deviation / MAX_ANGLE);
-  ui.threshold.style.left = cssPercent(settings.thresholdDeg / MAX_ANGLE);
-  ui.grace.style.width = cssPercent(engine.badMs / (settings.graceSeconds * 1000));
+  document.documentElement.style.setProperty('--glow', color);
+
+  const fill = Math.min(1, Math.max(0, deviation / MAX_ANGLE));
+  ui.ringProgress.style.strokeDashoffset = String(RING_LENGTH * (1 - fill));
+  // Sin inclinación el extremo redondeado pintaría un punto suelto arriba.
+  ui.ringProgress.style.opacity = fill < 0.005 ? '0' : '1';
+  ui.ringMark.style.transform = `rotate(${Math.min(1, settings.thresholdDeg / MAX_ANGLE) * 360}deg)`;
+
+  const graceRatio = engine.badMs / (settings.graceSeconds * 1000);
+  const showGrace = engine.phase === 'slouching' && graceRatio > 0;
+  ui.graceRow.hidden = !showGrace;
+  ui.thresholdHint.hidden = showGrace;
+  if (showGrace) {
+    const left = Math.max(0, settings.graceSeconds * (1 - graceRatio));
+    ui.graceText.textContent = settings.controlMode
+      ? 'Mala postura: se está registrando sin avisar'
+      : `Pitido en ${left.toFixed(1).replace('.', ',')} s si no te enderezas`;
+    ui.grace.style.width = cssPercent(graceRatio);
+  } else {
+    ui.thresholdHint.textContent = `Umbral ${formatDegrees(settings.thresholdDeg)} · la marca blanca del anillo`;
+  }
 
   ui.alerts.textContent = String(engine.totalAlerts);
   ui.badTime.textContent = formatDuration(engine.sessionBadMs);
@@ -465,8 +496,8 @@ function recordSession(): void {
   renderHistory();
 }
 
-/** Para leer: con espacio antes del %, como manda la tipografía en español. */
-const percent = (ratio: number) => `${(ratio * 100).toFixed(1)} %`;
+/** Para leer: con espacio antes del % y coma decimal, como en español. */
+const percent = (ratio: number) => formatPercent(ratio);
 /** Para CSS: sin espacio, o el navegador descarta la declaración entera. */
 const cssPercent = (ratio: number) => `${Math.min(100, Math.max(0, ratio * 100)).toFixed(1)}%`;
 
@@ -522,7 +553,8 @@ function downloadCsv(): void {
   link.href = url;
   link.download = `posturefix-sesiones-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
-  URL.revokeObjectURL(url);
+  // Revocar en el mismo tick puede cancelar la descarga en algunos navegadores.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // -------------------------------------------------------------- acciones ---
@@ -539,6 +571,7 @@ async function ensureDetector(): Promise<boolean> {
     setStatus('Preparando el detector…');
     await warmUp();
     restartLoop();
+    ui.stageEmpty.hidden = true;
     setStatus('Cámara lista. El vídeo no sale de este equipo.');
     return true;
   } catch (error) {
@@ -572,9 +605,26 @@ async function rebuildDetector(): Promise<void> {
   setStatus(`Detector listo (precisión ${settings.modelQuality === 'full' ? 'alta' : 'ligera'}).`);
 }
 
+/** `true` mientras se calibra: dos calibraciones a la vez se pisarían. */
+let calibrating = false;
+
 async function calibrate(): Promise<void> {
-  if (!(await ensureDetector())) return;
+  if (calibrating) return;
+  calibrating = true;
   ui.calibrate.disabled = true;
+  ui.start.disabled = true;
+  try {
+    await runCalibration();
+  } finally {
+    calibrating = false;
+    ui.calibrate.disabled = false;
+    ui.calibrate.textContent = 'Calibrar';
+    ui.start.disabled = false;
+  }
+}
+
+async function runCalibration(): Promise<void> {
+  if (!(await ensureDetector())) return;
   setStatus('Siéntate recto y no te muevas…');
   calibrationSamples = [];
 
@@ -582,12 +632,12 @@ async function calibrate(): Promise<void> {
   // fotograma puede tardar bastante más de lo previsto.
   const deadline = Date.now() + CALIBRATION_TIMEOUT_MS;
   while ((calibrationSamples?.length ?? 0) < CALIBRATION_SAMPLES && Date.now() < deadline) {
+    ui.calibrate.textContent = `Calibrando… ${calibrationSamples?.length ?? 0}/${CALIBRATION_SAMPLES}`;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   const samples = calibrationSamples ?? [];
   calibrationSamples = null;
-  ui.calibrate.disabled = false;
 
   if (samples.length < 3) {
     setStatus('No te he visto lo suficiente. Colócate frente a la cámara y repite.');
@@ -623,6 +673,7 @@ async function calibrate(): Promise<void> {
 }
 
 async function start(): Promise<void> {
+  if (calibrating) return;
   await alerts.unlock();
   if (!settings.baseline) {
     await calibrate();
@@ -657,8 +708,10 @@ function stop(): void {
 
 /** Reproduce la secuencia entera sin tener que encorvarse. */
 async function preview(): Promise<void> {
+  if (ui.test.disabled) return;
   await alerts.unlock();
   ui.test.disabled = true;
+  ui.test.textContent = 'Sonando…';
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   alerts.playBeep();
@@ -672,6 +725,7 @@ async function preview(): Promise<void> {
   await wait(3500);
   alerts.stopAll();
   ui.test.disabled = false;
+  ui.test.textContent = 'Probar alerta';
 }
 
 // -------------------------------------------------------------- ajustes ---
@@ -694,13 +748,20 @@ function syncInputs(): void {
   ui.inputs.voiceEnabled.checked = settings.voiceEnabled;
   ui.inputs.notificationsEnabled.checked = settings.notificationsEnabled;
   ui.inputs.controlMode.checked = settings.controlMode;
-  ui.inputs.modelQuality.value = settings.modelQuality;
-  ui.fairMode.textContent = fairModeOn ? 'Salir' : 'Activar';
-  ui.fairMode.classList.toggle('activo', fairModeOn);
+  ui.inputs.modelFull.checked = settings.modelQuality === 'full';
+  ui.inputs.modelLite.checked = settings.modelQuality === 'lite';
+  ui.fairMode.checked = fairModeOn;
+
+  // Tramo recorrido de cada deslizador, pintado en el acento como en iOS.
+  for (const range of [ui.inputs.thresholdDeg, ui.inputs.graceSeconds, ui.inputs.volume, ui.inputs.fps]) {
+    const min = Number(range.min);
+    const max = Number(range.max);
+    range.style.setProperty('--fill', cssPercent((Number(range.value) - min) / (max - min)));
+  }
 
   ui.values.thresholdDeg.textContent = `${settings.thresholdDeg}°`;
   ui.values.graceSeconds.textContent = `${settings.graceSeconds} s`;
-  ui.values.volume.textContent = `${Math.round(settings.volume * 100)}%`;
+  ui.values.volume.textContent = `${Math.round(settings.volume * 100)} %`;
   ui.values.fps.textContent = `${settings.fps} fps`;
 }
 
@@ -728,11 +789,14 @@ function toggleFairMode(): void {
 }
 
 function bindInputs(): void {
-  ui.inputs.modelQuality.addEventListener('change', () => {
-    update({ modelQuality: ui.inputs.modelQuality.value === 'lite' ? 'lite' : 'full' });
-    void rebuildDetector();
-  });
-  ui.fairMode.addEventListener('click', toggleFairMode);
+  for (const radio of [ui.inputs.modelFull, ui.inputs.modelLite]) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      update({ modelQuality: radio.value === 'lite' ? 'lite' : 'full' });
+      void rebuildDetector();
+    });
+  }
+  ui.fairMode.addEventListener('change', toggleFairMode);
   ui.noticeRecalibrate.addEventListener('click', () => void calibrate());
   ui.noticeDismiss.addEventListener('click', () => {
     reposition = clearReposition(reposition);
@@ -762,6 +826,37 @@ function bindInputs(): void {
   });
 }
 
+/**
+ * Atajos de teclado: Espacio empieza o para, C calibra y P prueba la alerta.
+ * No actúan mientras se escribe o con el foco en un control, que ya tiene su
+ * propio uso de esas teclas.
+ */
+function bindShortcuts(): void {
+  document.addEventListener('keydown', (event) => {
+    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.closest('input, select, textarea, button, label, [contenteditable]') || target.isContentEditable)) {
+      return;
+    }
+    if (event.code === 'Space') {
+      event.preventDefault();
+      if (!ui.start.disabled) ui.start.click();
+    } else if (event.key === 'c' || event.key === 'C') {
+      void calibrate();
+    } else if (event.key === 'p' || event.key === 'P') {
+      void preview();
+    }
+  });
+}
+
+/** El título grande se recoge en la barra de cristal al desplazarse, como en iOS. */
+function bindLargeTitle(): void {
+  if (!('IntersectionObserver' in window)) return;
+  new IntersectionObserver(([entry]) => ui.nav.classList.toggle('scrolled', !entry.isIntersecting), {
+    rootMargin: '-52px 0px 0px 0px',
+  }).observe(ui.largeTitle);
+}
+
 function main(): void {
   const marca = document.getElementById('version');
   if (marca) marca.textContent = `v${__VERSION__}`;
@@ -772,6 +867,9 @@ function main(): void {
   alerts.setVolume(settings.volume);
   syncInputs();
   bindInputs();
+  bindShortcuts();
+  bindLargeTitle();
+  ui.ringProgress.style.strokeDasharray = String(RING_LENGTH);
   render();
   renderHistory();
   renderNotice();
@@ -794,7 +892,7 @@ function main(): void {
     stopCamera(ui.video);
   });
 
-  setStatus('Pulsa «Calibrar postura» para empezar. El vídeo no sale de este equipo.');
+  setStatus('Pulsa «Calibrar» para encender la cámara y guardar tu postura.');
 }
 
 main();

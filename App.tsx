@@ -1,25 +1,25 @@
 import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { formatDuration } from './src/core/format';
+import { isAlerting } from './src/core/postureEngine';
 import { usePostureMonitor } from './src/hooks/usePostureMonitor';
 import { AlertOverlay } from './src/ui/AlertOverlay';
 import { Notice } from './src/ui/Notice';
 import { PostureGauge } from './src/ui/PostureGauge';
 import { ResultsCard } from './src/ui/ResultsCard';
 import { SettingsSheet } from './src/ui/SettingsSheet';
-import { StatusChip } from './src/ui/StatusChip';
-import { Button, Card, ExtendedFab, IconButton } from './src/ui/material';
-import { colors, spacing, type } from './src/ui/theme';
+import { AmbientBackground, Button, Card, IconButton, StatusPill, setUiHaptics } from './src/ui/glass';
+import { colors, phaseColors, roundedNumbers, spacing, type } from './src/ui/theme';
 
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes > 0 ? `${minutes} min ${seconds}s` : `${seconds}s`;
-}
+const STEPS = [
+  'Guarda el móvil en el bolsillo del pecho o del pantalón, o sujétalo al cinturón.',
+  'Siéntate o ponte de pie con la espalda recta.',
+  'Pulsa «Calibrar» y no te muevas un par de segundos.',
+];
 
 export default function App() {
   const monitor = usePostureMonitor();
@@ -32,138 +32,172 @@ export default function App() {
     running,
     calibration,
     calibrationQuality,
+    calibrationFailed,
+    previewing,
     sensorMoved,
     headphones,
     alarmSound,
     sensorAvailable,
   } = monitor;
   const calibrated = settings.baseline != null;
+  const calibrating = calibration === 'calibrating';
   const graceProgress = engine.badMs / Math.max(1, settings.graceSeconds * 1000);
+
+  // Los toques suaves de la interfaz siguen el ajuste de vibración.
+  useEffect(() => setUiHaptics(settings.vibrationEnabled), [settings.vibrationEnabled]);
+
+  // El fondo se tiñe con el estado; en control no se enseña el rojo de alerta.
+  const accent =
+    settings.controlMode && isAlerting(engine.phase) ? colors.yellow : (phaseColors[engine.phase] ?? colors.neutral);
+
+  const stats = [
+    { value: String(engine.totalAlerts), label: 'alertas' },
+    { value: formatDuration(engine.sessionBadMs), label: 'agachado' },
+    { value: formatDuration(engine.sessionMs), label: 'sesión' },
+  ];
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.root}>
         <StatusBar style="light" />
-        <ScrollView contentContainerStyle={styles.content}>
-          {/* Barra superior de Material 3: título grande y una acción a la derecha. */}
-          <View style={styles.appBar}>
-            <View style={styles.appBarText}>
-              <Text style={styles.brand}>PostureFix</Text>
-              <Text style={styles.tagline}>Si te agachas demasiado, te enteras.</Text>
+        <AmbientBackground accent={accent} />
+
+        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Título grande de iOS y el botón de ajustes en cristal. */}
+            <View style={styles.header}>
+              <View style={styles.headerText}>
+                <Text style={styles.brand} accessibilityRole="header">
+                  PostureFix
+                </Text>
+                <Text style={styles.tagline}>Si te agachas demasiado, te enteras.</Text>
+              </View>
+              <IconButton glyph="⚙︎" onPress={() => setSettingsVisible(true)} accessibilityLabel="Abrir ajustes" />
             </View>
-            <IconButton
-              icon="⚙︎"
-              onPress={() => setSettingsVisible(true)}
-              accessibilityLabel="Abrir ajustes"
-              tone={colors.onSurface}
-            />
-          </View>
 
-          <View style={styles.chips}>
-            <StatusChip
-              label={running ? 'Vigilando' : 'En pausa'}
-              tone={running ? 'good' : 'neutral'}
-            />
-            <StatusChip
-              label={headphones.connected ? 'Auriculares' : 'Altavoz'}
-              tone={headphones.connected ? 'good' : 'neutral'}
-            />
-            <StatusChip label={alarmSound === 'eas' ? 'Alarma EAS' : 'Sirena'} tone="warn" />
-            {settings.controlMode ? <StatusChip label="Sesión de control" tone="warn" /> : null}
-            {sensorAvailable === false ? <StatusChip label="Sin acelerómetro" tone="danger" /> : null}
-          </View>
+            <View style={styles.pills}>
+              <StatusPill
+                label={running ? 'Vigilando' : 'En pausa'}
+                color={running ? colors.green : colors.neutral}
+                emphasized={running}
+              />
+              <StatusPill
+                label={headphones.connected ? 'Auriculares' : 'Altavoz'}
+                color={headphones.connected ? colors.green : colors.neutral}
+                emphasized={headphones.connected}
+              />
+              <StatusPill label={alarmSound === 'eas' ? 'Alarma EAS' : 'Sirena'} color={colors.tint} />
+              {settings.controlMode ? <StatusPill label="Sesión de control" color={colors.yellow} emphasized /> : null}
+              {sensorAvailable === false ? <StatusPill label="Sin acelerómetro" color={colors.red} emphasized /> : null}
+            </View>
 
-          {calibrated ? null : (
-            <Card>
-              <Text style={styles.cardTitle}>Antes de empezar</Text>
-              <Text style={styles.cardBody}>
-                1. Guarda el móvil en el bolsillo del pecho o del pantalón, o sujétalo al cinturón.{'\n'}
-                2. Siéntate o ponte de pie con la espalda recta.{'\n'}
-                3. Pulsa <Text style={styles.bold}>Calibrar postura</Text> y no te muevas 2 segundos.
-              </Text>
-            </Card>
-          )}
-
-          {sensorMoved ? (
-            <Notice
-              tone="danger"
-              title="¿Has movido el móvil?"
-              body="Después de un meneo el ángulo ha dado un salto grande, así que la postura que guardaste ya no describe tu espalda. La vigilancia está en pausa hasta que recalibres."
-              actions={[
-                { label: 'Recalibrar', onPress: () => void monitor.calibrate() },
-                { label: 'No lo he movido', onPress: monitor.dismissSensorMoved },
-              ]}
-            />
-          ) : null}
-
-          {calibrationQuality && !calibrationQuality.steady && !sensorMoved ? (
-            <Notice
-              tone="warn"
-              title="Calibración poco fiable"
-              body={`Las lecturas bailaban ±${calibrationQuality.spreadDeg.toFixed(1)}° mientras calibrabas. Siéntate recto, quédate quieto y repite para que las medidas sean exactas.`}
-              actions={[{ label: 'Repetir calibración', onPress: () => void monitor.calibrate() }]}
-            />
-          ) : null}
-
-          <Card variant="elevated" style={styles.gaugeCard}>
-            <PostureGauge
-              deviationDeg={engine.deviationDeg}
-              thresholdDeg={settings.thresholdDeg}
-              phase={engine.phase}
-              graceProgress={graceProgress}
-              controlMode={settings.controlMode}
-            />
-          </Card>
-
-          <ExtendedFab
-            label={running ? 'Parar vigilancia' : 'Empezar a vigilar'}
-            onPress={() => (running ? monitor.stop() : void monitor.start())}
-            color={running ? colors.errorContainer : colors.primary}
-            onColor={running ? colors.onErrorContainer : colors.onPrimary}
-          />
-
-          <View style={styles.secondaryRow}>
-            <Button
-              label={calibration === 'calibrating' ? 'Calibrando…' : 'Calibrar postura'}
-              onPress={() => void monitor.calibrate()}
-              variant="tonal"
-              stretch
-            />
-            <Button
-              label="Probar alerta"
-              onPress={() => void monitor.previewAlarm()}
-              variant="outlined"
-              stretch
-            />
-          </View>
-
-          <View style={styles.stats}>
-            {[
-              { value: String(engine.totalAlerts), label: 'alertas' },
-              { value: formatDuration(engine.sessionBadMs), label: 'agachado' },
-              { value: formatDuration(engine.sessionMs), label: 'sesión' },
-            ].map((stat) => (
-              <Card key={stat.label} style={styles.stat}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
+            {calibrated ? null : (
+              <Card>
+                <Text style={styles.cardTitle}>Antes de empezar</Text>
+                {STEPS.map((step, index) => (
+                  <View key={step} style={styles.step}>
+                    <View style={styles.stepBadge}>
+                      <Text style={styles.stepNumber}>{index + 1}</Text>
+                    </View>
+                    <Text style={styles.stepText}>{step}</Text>
+                  </View>
+                ))}
               </Card>
-            ))}
-          </View>
+            )}
 
-          <ResultsCard history={history} />
+            {sensorMoved ? (
+              <Notice
+                tone="danger"
+                title="¿Has movido el móvil?"
+                body="Después de un meneo el ángulo ha dado un salto grande, así que la postura que guardaste ya no describe tu espalda. La vigilancia está en pausa hasta que recalibres."
+                actions={[
+                  { label: 'Recalibrar', onPress: () => void monitor.calibrate() },
+                  { label: 'No lo he movido', onPress: monitor.dismissSensorMoved },
+                ]}
+              />
+            ) : null}
 
-          <Text style={styles.footer}>
-            PostureFix {Constants.expoConfig?.version ?? ''} · Con auriculares suena el tono de emergencia EAS (853 + 960 Hz); por altavoz, una sirena de dos
-            tonos. La vigilancia necesita la app en primer plano: el sistema apaga el acelerómetro al
-            bloquear el móvil.
-          </Text>
-        </ScrollView>
+            {calibrationFailed && !calibrating ? (
+              <Notice
+                tone="danger"
+                title="No he podido calibrar"
+                body="Te movías demasiado mientras calibraba y no ha quedado ninguna lectura fiable. Quédate quieto con la espalda recta y repite."
+                actions={[{ label: 'Repetir', onPress: () => void monitor.calibrate() }]}
+              />
+            ) : null}
 
-        <AlertOverlay
-          phase={engine.phase}
-          countsSpoken={engine.countsSpoken}
-          controlMode={settings.controlMode}
-        />
+            {calibrationQuality && !calibrationQuality.steady && !sensorMoved && !calibrationFailed ? (
+              <Notice
+                tone="warn"
+                title="Calibración poco fiable"
+                body={`Las lecturas bailaban ±${calibrationQuality.spreadDeg
+                  .toFixed(1)
+                  .replace('.', ',')}° mientras calibrabas. Siéntate recto, quédate quieto y repite para que las medidas sean exactas.`}
+                actions={[{ label: 'Repetir calibración', onPress: () => void monitor.calibrate() }]}
+              />
+            ) : null}
+
+            <Card style={styles.gaugeCard}>
+              <PostureGauge
+                deviationDeg={engine.deviationDeg}
+                thresholdDeg={settings.thresholdDeg}
+                phase={engine.phase}
+                graceProgress={graceProgress}
+                graceSeconds={settings.graceSeconds}
+                controlMode={settings.controlMode}
+              />
+            </Card>
+
+            <Button
+              label={running ? 'Parar vigilancia' : calibrating ? 'Calibrando…' : 'Empezar a vigilar'}
+              onPress={() => (running ? monitor.stop() : void monitor.start())}
+              variant="prominent"
+              size="large"
+              color={running ? colors.red : colors.tint}
+              onColor={running ? colors.onStatus : colors.onTint}
+              disabled={calibrating || sensorAvailable === false}
+              haptic="medium"
+              accessibilityHint={running ? 'Guarda la sesión y deja de avisar' : 'Empieza a medir tu postura'}
+            />
+
+            <View style={styles.secondaryRow}>
+              <Button
+                label={calibrating ? 'Calibrando…' : 'Calibrar'}
+                onPress={() => void monitor.calibrate()}
+                disabled={calibrating || sensorAvailable === false}
+                stretch
+                accessibilityHint="Guarda tu postura actual como la buena"
+              />
+              <Button
+                label={previewing ? 'Sonando…' : 'Probar alerta'}
+                onPress={() => void monitor.previewAlarm()}
+                disabled={previewing}
+                stretch
+                accessibilityHint="Reproduce la secuencia de aviso completa"
+              />
+            </View>
+
+            <Card style={styles.stats}>
+              {stats.map((stat, index) => (
+                <View key={stat.label} style={[styles.stat, index > 0 && styles.statDivider]}>
+                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {stat.value}
+                  </Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              ))}
+            </Card>
+
+            <ResultsCard history={history} />
+
+            <Text style={styles.footer}>
+              PostureFix {Constants.expoConfig?.version ?? ''} · La vigilancia necesita la app en primer plano: el sistema
+              apaga el acelerómetro al bloquear el móvil.
+            </Text>
+          </ScrollView>
+        </SafeAreaView>
+
+        <AlertOverlay phase={engine.phase} countsSpoken={engine.countsSpoken} controlMode={settings.controlMode} />
 
         <SettingsSheet
           visible={settingsVisible}
@@ -174,33 +208,39 @@ export default function App() {
           onClearHistory={monitor.clearHistory}
           onClose={() => setSettingsVisible(false)}
         />
-      </SafeAreaView>
+      </View>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
-  appBar: {
-    flexDirection: 'row',
+  root: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1 },
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: 56, gap: spacing.lg },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  headerText: { flex: 1 },
+  brand: { ...type.largeTitle, color: colors.label },
+  tagline: { ...type.subheadline, color: colors.secondaryLabel },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  cardTitle: { ...type.headline, color: colors.label },
+  step: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  stepBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.tint,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 64,
-    gap: spacing.md,
+    justifyContent: 'center',
+    marginTop: -1,
   },
-  appBarText: { flex: 1 },
-  brand: { ...type.headlineMedium, color: colors.onSurface, fontWeight: '500' },
-  tagline: { ...type.bodyMedium, color: colors.onSurfaceVariant },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  cardTitle: { ...type.titleMedium, color: colors.onSurface },
-  cardBody: { ...type.bodyMedium, color: colors.onSurfaceVariant },
-  bold: { color: colors.onSurface, fontWeight: '700' },
-  gaugeCard: { paddingVertical: spacing.xl },
+  stepNumber: { ...type.footnote, ...roundedNumbers, fontWeight: '700', color: colors.onTint },
+  stepText: { ...type.subheadline, color: colors.secondaryLabel, flex: 1 },
+  gaugeCard: { paddingVertical: spacing.xxl },
   secondaryRow: { flexDirection: 'row', gap: spacing.md },
-  stats: { flexDirection: 'row', gap: spacing.md },
-  stat: { flex: 1, alignItems: 'center', gap: 0, paddingVertical: spacing.lg, paddingHorizontal: spacing.sm },
-  statValue: { ...type.titleLarge, color: colors.onSurface },
-  statLabel: { ...type.labelMedium, color: colors.onSurfaceVariant, fontWeight: '400' },
-  footer: { ...type.bodySmall, color: colors.onSurfaceVariant },
+  stats: { flexDirection: 'row', paddingVertical: spacing.lg, paddingHorizontal: 0, gap: 0 },
+  stat: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.sm },
+  statDivider: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.separator },
+  statValue: { ...type.title2, ...roundedNumbers, color: colors.label },
+  statLabel: { ...type.footnote, color: colors.secondaryLabel },
+  footer: { ...type.footnote, color: colors.tertiaryLabel, textAlign: 'center', paddingHorizontal: spacing.lg },
 });

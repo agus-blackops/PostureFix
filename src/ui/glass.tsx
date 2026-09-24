@@ -1,0 +1,657 @@
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Children, Fragment, useEffect, useRef, type ReactNode } from 'react';
+import {
+  Animated,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+
+import { uiFeedback, type UiFeedback } from '../services/haptics';
+import {
+  colors,
+  continuous,
+  materials,
+  radius,
+  roundedNumbers,
+  shadow,
+  spacing,
+  springs,
+  type,
+  withAlpha,
+  type MaterialName,
+} from './theme';
+
+/**
+ * Piezas de la interfaz hechas de cristal. En iOS 26 son Liquid Glass de verdad
+ * (`expo-glass-effect`); en iOS anteriores, los materiales de desenfoque de
+ * UIKit (`expo-blur`); en Android, un cristal translúcido con su filo de luz,
+ * que el desenfoque en tiempo real allí cuesta batería y no aporta sobre un
+ * fondo que ya es un degradado suave.
+ */
+
+const LIQUID_GLASS = (() => {
+  try {
+    return Platform.OS === 'ios' && isLiquidGlassAvailable();
+  } catch {
+    return false;
+  }
+})();
+
+let hapticsEnabled = true;
+
+/** La interfaz sigue el ajuste de vibración de la app para sus toques suaves. */
+export function setUiHaptics(enabled: boolean): void {
+  hapticsEnabled = enabled;
+}
+
+function feedback(kind: UiFeedback): void {
+  uiFeedback(kind, hapticsEnabled);
+}
+
+const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
+
+// ------------------------------------------------------------- superficie ---
+
+interface GlassSurfaceProps {
+  children?: ReactNode;
+  material?: MaterialName;
+  cornerRadius?: number;
+  /** Tinte del cristal, en rgba: rojo para parar, amarillo para un aviso... */
+  tintColor?: string;
+  /** El cristal reacciona al toque (solo Liquid Glass). */
+  interactive?: boolean;
+  style?: StyleProp<ViewStyle>;
+}
+
+/** La base de todo: un trozo de cristal con esquinas continuas y filo de luz. */
+export function GlassSurface({
+  children,
+  material = 'regular',
+  cornerRadius = radius.large,
+  tintColor,
+  interactive = false,
+  style,
+}: GlassSurfaceProps) {
+  const shape: StyleProp<ViewStyle> = [{ borderRadius: cornerRadius }, continuous, styles.clip];
+
+  if (LIQUID_GLASS) {
+    return (
+      <GlassView
+        glassEffectStyle="regular"
+        colorScheme="dark"
+        tintColor={tintColor}
+        isInteractive={interactive}
+        style={[shape, style]}>
+        {children}
+      </GlassView>
+    );
+  }
+
+  const spec = materials[material];
+  return (
+    <View style={[shape, styles.edge, Platform.OS === 'android' && { backgroundColor: spec.fallback }, style]}>
+      {Platform.OS === 'android' ? null : (
+        <BlurView tint={spec.tint} intensity={spec.intensity} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      )}
+      {tintColor ? (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tintColor }]} />
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
+/** Tarjeta de cristal con el relleno y el espaciado de la app. */
+export function Card({
+  children,
+  material = 'regular',
+  tintColor,
+  style,
+}: {
+  children: ReactNode;
+  material?: MaterialName;
+  tintColor?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <GlassSurface material={material} tintColor={tintColor} style={[styles.card, style]}>
+      {children}
+    </GlassSurface>
+  );
+}
+
+// ---------------------------------------------------------------- fondo ---
+
+/** Resplandor neutro para cuando no se está midiendo. */
+const NEUTRAL_GLOW = colors.neutral;
+const GLOW_COLORS = [NEUTRAL_GLOW, colors.green, colors.yellow, colors.tint, colors.red] as const;
+
+const glowImage = (color: string) =>
+  `radial-gradient(circle at 90% 100%, ${withAlpha(color, 0.34)} 0%, ${withAlpha(color, 0)} 62%)`;
+const BASE_GLOW = `radial-gradient(circle at 0% 0%, ${withAlpha(colors.tint, 0.26)} 0%, ${withAlpha(
+  colors.tint,
+  0
+)} 58%)`;
+
+/** El degradado va por la propiedad nativa en iOS/Android y por CSS en la web. */
+const gradientStyle = (image: string): ViewStyle =>
+  (Platform.OS === 'web' ? { backgroundImage: image } : { experimental_backgroundImage: image }) as ViewStyle;
+
+/**
+ * Fondo de la app: negro cálido con dos resplandores. El de arriba es siempre
+ * el naranja de la marca; el de abajo toma el color del estado de la postura y
+ * cambia con un fundido, así el cristal de encima se tiñe solo.
+ */
+export function AmbientBackground({ accent }: { accent: string }) {
+  const target = (GLOW_COLORS as readonly string[]).includes(accent) ? accent : NEUTRAL_GLOW;
+  const layers = useRef(
+    Object.fromEntries(GLOW_COLORS.map((color) => [color, new Animated.Value(color === target ? 1 : 0)]))
+  ).current;
+
+  useEffect(() => {
+    Animated.parallel(
+      GLOW_COLORS.map((color) =>
+        Animated.timing(layers[color], {
+          toValue: color === target ? 1 : 0,
+          duration: 700,
+          useNativeDriver: true,
+        })
+      )
+    ).start();
+  }, [layers, target]);
+
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.background]}>
+      <View style={[StyleSheet.absoluteFill, gradientStyle(BASE_GLOW)]} />
+      {GLOW_COLORS.map((color) => (
+        <Animated.View
+          key={color}
+          style={[StyleSheet.absoluteFill, gradientStyle(glowImage(color)), { opacity: layers[color] }]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// -------------------------------------------------------------- botones ---
+
+/** Encogerse un poco al pulsar y volver con un rebote corto, como en iOS. */
+function usePressScale() {
+  const scale = useRef(new Animated.Value(1)).current;
+  return {
+    scale,
+    pressIn: () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, ...springs.press }).start(),
+    pressOut: () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...springs.release }).start(),
+  };
+}
+
+type ButtonVariant = 'prominent' | 'glass' | 'plain';
+type ButtonSize = 'large' | 'regular' | 'small';
+
+interface ButtonProps {
+  label: string;
+  onPress: () => void;
+  /** `prominent` es la acción principal; `glass`, la secundaria; `plain`, texto. */
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Relleno del botón `prominent` o color del texto en `glass` / `plain`. */
+  color?: string;
+  /** Texto sobre el relleno de `prominent`. */
+  onColor?: string;
+  disabled?: boolean;
+  /** El botón ocupa todo el ancho que le deja su fila. */
+  stretch?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  haptic?: UiFeedback;
+}
+
+const BUTTON_HEIGHT: Record<ButtonSize, number> = { large: 56, regular: 48, small: 34 };
+
+export function Button({
+  label,
+  onPress,
+  variant = 'glass',
+  size = 'regular',
+  color,
+  onColor = colors.onTint,
+  disabled = false,
+  stretch = false,
+  accessibilityLabel,
+  accessibilityHint,
+  haptic = 'light',
+}: ButtonProps) {
+  const { scale, pressIn, pressOut } = usePressScale();
+  const fill = color ?? colors.tint;
+  const textColor = variant === 'prominent' ? onColor : (color ?? (variant === 'plain' ? colors.tint : colors.label));
+  const labelStyle = size === 'small' ? styles.labelSmall : type.headline;
+  const height = BUTTON_HEIGHT[size];
+
+  const label$ = (
+    <Text style={[labelStyle, styles.buttonLabel, { color: textColor }]} numberOfLines={1}>
+      {label}
+    </Text>
+  );
+
+  const body =
+    variant === 'glass' ? (
+      <GlassSurface
+        material="thin"
+        cornerRadius={radius.capsule}
+        interactive
+        style={[styles.buttonBody, { minHeight: height }, size === 'small' && styles.buttonBodySmall]}>
+        {label$}
+      </GlassSurface>
+    ) : (
+      <View
+        style={[
+          styles.buttonBody,
+          { minHeight: height },
+          size === 'small' && styles.buttonBodySmall,
+          variant === 'prominent' && { backgroundColor: fill },
+        ]}>
+        {label$}
+      </View>
+    );
+
+  return (
+    <Animated.View
+      style={[
+        stretch && styles.stretch,
+        { transform: [{ scale }] },
+        variant === 'prominent' && size === 'large' && !disabled && [shadow.soft, { shadowColor: fill, shadowOpacity: 0.4 }],
+        disabled && styles.disabled,
+      ]}>
+      <Pressable
+        onPress={() => {
+          feedback(haptic);
+          onPress();
+        }}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        disabled={disabled}
+        hitSlop={size === 'small' ? 6 : 0}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={{ disabled }}>
+        {body}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/** Botón redondo de cristal de 44 pt, la zona táctil mínima de Apple. */
+export function IconButton({
+  glyph,
+  onPress,
+  accessibilityLabel,
+}: {
+  glyph: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  const { scale, pressIn, pressOut } = usePressScale();
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={() => {
+          feedback('light');
+          onPress();
+        }}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}>
+        <GlassSurface material="thin" cornerRadius={radius.capsule} interactive style={styles.iconButton}>
+          <Text style={styles.iconGlyph}>{glyph}</Text>
+        </GlassSurface>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// ------------------------------------------------------------- estados ---
+
+/**
+ * Cápsula de estado (vigilando, auriculares, tipo de alarma). Resaltada lleva
+ * el cristal teñido del color; si no, se queda en gris para no competir.
+ */
+export function StatusPill({ label, color, emphasized = false }: { label: string; color: string; emphasized?: boolean }) {
+  return (
+    <GlassSurface
+      material="thin"
+      cornerRadius={radius.capsule}
+      tintColor={emphasized ? withAlpha(color, 0.16) : undefined}
+      style={styles.pill}>
+      <View accessible accessibilityLabel={label} style={styles.pillContent}>
+        <View style={[styles.pillDot, { backgroundColor: color }]} />
+        <Text style={[styles.pillLabel, { color: emphasized ? color : colors.secondaryLabel }]}>{label}</Text>
+      </View>
+    </GlassSurface>
+  );
+}
+
+// -------------------------------------------------------------- listas ---
+
+/**
+ * Grupo de filas al estilo de Ajustes de iOS: cabecera en versalitas, las filas
+ * dentro de un mismo cristal con separadores sangrados y una nota al pie.
+ */
+export function ListGroup({ header, footer, children }: { header?: string; footer?: string; children: ReactNode }) {
+  const rows = Children.toArray(children).filter(Boolean);
+  return (
+    <View style={styles.group}>
+      {header ? (
+        <Text style={styles.groupHeader} accessibilityRole="header">
+          {header.toUpperCase()}
+        </Text>
+      ) : null}
+      <GlassSurface material="regular" cornerRadius={radius.medium}>
+        {rows.map((row, index) => (
+          <Fragment key={index}>
+            {index > 0 ? <View style={styles.rowSeparator} /> : null}
+            {row}
+          </Fragment>
+        ))}
+      </GlassSurface>
+      {footer ? <Text style={styles.groupFooter}>{footer}</Text> : null}
+    </View>
+  );
+}
+
+/** Fila de una lista: título, explicación opcional y el control a la derecha. */
+export function ListRow({ title, subtitle, accessory }: { title: string; subtitle?: string; accessory?: ReactNode }) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowText}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {accessory}
+    </View>
+  );
+}
+
+/**
+ * «Stepper» de iOS: una cápsula con − y + separados por una línea. Cada mitad
+ * se apaga al llegar a su límite, en vez de aceptar toques que no hacen nada.
+ */
+export function Stepper({
+  label,
+  onDecrease,
+  onIncrease,
+  canDecrease,
+  canIncrease,
+}: {
+  label: string;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  canDecrease: boolean;
+  canIncrease: boolean;
+}) {
+  const half = (glyph: string, enabled: boolean, action: () => void, a11y: string) => (
+    <Pressable
+      disabled={!enabled}
+      onPress={() => {
+        feedback('selection');
+        action();
+      }}
+      hitSlop={{ top: 8, bottom: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      accessibilityState={{ disabled: !enabled }}
+      style={({ pressed }) => [styles.stepperHalf, pressed && styles.stepperPressed]}>
+      <Text style={[styles.stepperGlyph, !enabled && styles.stepperGlyphOff]}>{glyph}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={styles.stepper}>
+      {half('−', canDecrease, onDecrease, `Bajar ${label}`)}
+      <View style={styles.stepperDivider} />
+      {half('+', canIncrease, onIncrease, `Subir ${label}`)}
+    </View>
+  );
+}
+
+/** Interruptor de iOS con el acento de la app y un toque al cambiarlo. */
+export function Toggle({
+  value,
+  onValueChange,
+  accessibilityLabel,
+}: {
+  value: boolean;
+  onValueChange: (next: boolean) => void;
+  accessibilityLabel: string;
+}) {
+  return (
+    <Switch
+      value={value}
+      onValueChange={(next) => {
+        feedback('selection');
+        onValueChange(next);
+      }}
+      trackColor={{ false: colors.fill, true: colors.tint }}
+      thumbColor={colors.label}
+      ios_backgroundColor={colors.fill}
+      accessibilityLabel={accessibilityLabel}
+    />
+  );
+}
+
+// ------------------------------------------------------------ progreso ---
+
+/** Barra de progreso en cápsula, que se mueve con un muelle y no a saltos. */
+export function ProgressBar({
+  progress,
+  color,
+  markAt,
+  height = 8,
+}: {
+  progress: number;
+  color: string;
+  /** Marca fina en esa fracción de la barra: el umbral. */
+  markAt?: number;
+  height?: number;
+}) {
+  const target = clamp01(progress);
+  const value = useRef(new Animated.Value(target)).current;
+  useEffect(() => {
+    Animated.spring(value, { toValue: target, useNativeDriver: false, ...springs.value }).start();
+  }, [target, value]);
+  const width = value.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'], extrapolate: 'clamp' });
+
+  return (
+    <View style={[styles.track, { height, borderRadius: height / 2 }]}>
+      <Animated.View style={[styles.trackFill, { width, backgroundColor: color, borderRadius: height / 2 }]} />
+      {markAt == null ? null : (
+        <View style={[styles.trackMark, { left: `${clamp01(markAt) * 100}%` }]} />
+      )}
+    </View>
+  );
+}
+
+/**
+ * Anillo de progreso al estilo de los anillos de Actividad, sin SVG: cada
+ * mitad del círculo es un semianillo recortado que gira dentro de su mitad de
+ * la caja. Lleva extremos redondeados y una marca en el umbral.
+ */
+export function ProgressRing({
+  size,
+  stroke,
+  progress,
+  color,
+  trackColor,
+  markAt,
+  children,
+}: {
+  size: number;
+  stroke: number;
+  progress: number;
+  color: string;
+  trackColor: string;
+  markAt?: number;
+  children?: ReactNode;
+}) {
+  const target = clamp01(progress);
+  const value = useRef(new Animated.Value(target)).current;
+  useEffect(() => {
+    Animated.spring(value, { toValue: target, useNativeDriver: true, ...springs.value }).start();
+  }, [target, value]);
+
+  const half = size / 2;
+  const ring: ViewStyle = { width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: color };
+  const rightTurn = value.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '180deg', '180deg'], extrapolate: 'clamp' });
+  const leftTurn = value.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '0deg', '180deg'], extrapolate: 'clamp' });
+  const endTurn = value.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'], extrapolate: 'clamp' });
+  // Sin progreso no se pinta nada: evita el hilo de un píxel en la costura.
+  const rightVisible = value.interpolate({ inputRange: [0, 0.004], outputRange: [0, 1], extrapolate: 'clamp' });
+  const leftVisible = value.interpolate({ inputRange: [0.5, 0.504], outputRange: [0, 1], extrapolate: 'clamp' });
+  const cap: ViewStyle = {
+    position: 'absolute',
+    top: 0,
+    left: half - stroke / 2,
+    width: stroke,
+    height: stroke,
+    borderRadius: stroke / 2,
+    backgroundColor: color,
+  };
+
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={[StyleSheet.absoluteFill, ring, { borderColor: trackColor }]} />
+
+      {/* Mitad derecha: el tramo de 0 a 180°. */}
+      <View style={[styles.ringHalf, { left: half, width: half, height: size }]}>
+        <Animated.View
+          style={[styles.ringTurn, { left: -half, width: size, height: size, opacity: rightVisible, transform: [{ rotate: rightTurn }] }]}>
+          <View style={[styles.ringHalf, { left: 0, width: half, height: size }]}>
+            <View style={ring} />
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* Mitad izquierda: el tramo de 180 a 360°. */}
+      <View style={[styles.ringHalf, { left: 0, width: half, height: size }]}>
+        <Animated.View
+          style={[styles.ringTurn, { left: 0, width: size, height: size, opacity: leftVisible, transform: [{ rotate: leftTurn }] }]}>
+          <View style={[styles.ringHalf, { left: half, width: half, height: size }]}>
+            <View style={[ring, { marginLeft: -half }]} />
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* Extremos redondeados: el de salida fijo arriba y el de llegada girando. */}
+      <Animated.View style={[cap, { opacity: rightVisible }]} />
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { opacity: rightVisible, transform: [{ rotate: endTurn }] }]}>
+        <View style={cap} />
+      </Animated.View>
+
+      {markAt == null ? null : (
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${clamp01(markAt) * 360}deg` }] }]}>
+          <View style={[styles.ringMark, { left: half - 1.5, height: stroke + 8, top: -4 }]} />
+        </View>
+      )}
+
+      <View style={[StyleSheet.absoluteFill, styles.ringCenter]}>{children}</View>
+    </View>
+  );
+}
+
+/** Cifra grande en San Francisco redondeada. */
+export function BigNumber({ children, color, size = 56 }: { children: ReactNode; color: string; size?: number }) {
+  return (
+    <Text
+      style={[
+        roundedNumbers,
+        { color, fontSize: size, lineHeight: Math.round(size * 1.1), fontWeight: '700', letterSpacing: -0.5 },
+      ]}>
+      {children}
+    </Text>
+  );
+}
+
+const styles = StyleSheet.create({
+  clip: { overflow: 'hidden' },
+  edge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassEdge,
+    borderTopColor: colors.glassHighlight,
+  },
+  background: { backgroundColor: colors.background },
+
+  card: { padding: spacing.xl, gap: spacing.md },
+
+  stretch: { flex: 1 },
+  disabled: { opacity: 0.4 },
+  buttonBody: {
+    borderRadius: radius.capsule,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonBodySmall: { paddingHorizontal: spacing.lg },
+  buttonLabel: { textAlign: 'center' },
+  labelSmall: { ...type.subheadline, fontWeight: '600' },
+
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  iconGlyph: { fontSize: 21, color: colors.label },
+
+  pill: { minHeight: 30, justifyContent: 'center' },
+  pillContent: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 6 },
+  pillDot: { width: 7, height: 7, borderRadius: 4 },
+  pillLabel: { ...type.footnote, fontWeight: '600' },
+
+  group: { gap: 6 },
+  groupHeader: { ...type.footnote, color: colors.secondaryLabel, paddingHorizontal: spacing.lg },
+  groupFooter: { ...type.footnote, color: colors.secondaryLabel, paddingHorizontal: spacing.lg },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    minHeight: 48,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 11,
+  },
+  rowText: { flex: 1, gap: 2 },
+  rowTitle: { ...type.body, color: colors.label },
+  rowSubtitle: { ...type.footnote, color: colors.secondaryLabel },
+  rowSeparator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: spacing.lg },
+
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: colors.tertiaryFill,
+    ...continuous,
+    overflow: 'hidden',
+  },
+  stepperHalf: { width: 46, height: 32, alignItems: 'center', justifyContent: 'center' },
+  stepperPressed: { backgroundColor: colors.fill },
+  stepperGlyph: { fontSize: 22, lineHeight: 24, color: colors.label, fontWeight: '500' },
+  stepperGlyphOff: { color: colors.quaternaryLabel },
+  stepperDivider: { width: StyleSheet.hairlineWidth, height: 18, backgroundColor: colors.separator },
+
+  track: { width: '100%', backgroundColor: colors.tertiaryFill, overflow: 'hidden', justifyContent: 'center' },
+  trackFill: { height: '100%' },
+  trackMark: { position: 'absolute', width: 3, marginLeft: -1.5, height: '100%', borderRadius: 2, backgroundColor: colors.label },
+
+  ringHalf: { position: 'absolute', top: 0, overflow: 'hidden' },
+  ringTurn: { position: 'absolute', top: 0 },
+  ringMark: { position: 'absolute', width: 3, borderRadius: 2, backgroundColor: colors.label },
+  ringCenter: { alignItems: 'center', justifyContent: 'center' },
+});

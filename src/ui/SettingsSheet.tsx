@@ -1,8 +1,9 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LIMITS, clamp, type Settings } from '../core/settings';
-import { Button, Divider, ListItem, Subheader } from './material';
-import { STATE_PRESSED, colors, shape, spacing, stateLayer, type } from './theme';
+import { Button, GlassSurface, ListGroup, ListRow, Stepper, Toggle } from './glass';
+import { colors, radius, roundedNumbers, spacing, type } from './theme';
 
 interface Props {
   visible: boolean;
@@ -15,77 +16,12 @@ interface Props {
   onClose: () => void;
 }
 
-interface StepperProps {
-  label: string;
-  hint?: string;
-  value: string;
-  onDecrease: () => void;
-  onIncrease: () => void;
-}
-
-/** Botón circular de 40 dp para los pasos, con contorno como los icon buttons de M3. */
-function StepButton({ glyph, label, onPress }: { glyph: string; label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.stepButton,
-        pressed && { backgroundColor: stateLayer(colors.onSurface, STATE_PRESSED) },
-      ]}>
-      <Text style={styles.stepGlyph}>{glyph}</Text>
-    </Pressable>
-  );
-}
-
-function Stepper({ label, hint, value, onDecrease, onIncrease }: StepperProps) {
-  return (
-    <ListItem
-      headline={label}
-      supporting={hint}
-      trailing={
-        <View style={styles.stepper}>
-          <StepButton glyph="−" label={`Bajar ${label}`} onPress={onDecrease} />
-          <Text style={styles.stepValue}>{value}</Text>
-          <StepButton glyph="+" label={`Subir ${label}`} onPress={onIncrease} />
-        </View>
-      }
-    />
-  );
-}
-
-function Toggle({
-  label,
-  hint,
-  value,
-  onValueChange,
-}: {
-  label: string;
-  hint?: string;
-  value: boolean;
-  onValueChange: (next: boolean) => void;
-}) {
-  return (
-    <ListItem
-      headline={label}
-      supporting={hint}
-      trailing={
-        <Switch
-          value={value}
-          onValueChange={onValueChange}
-          trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
-          thumbColor={value ? colors.onPrimary : colors.outline}
-          ios_backgroundColor={colors.surfaceContainerHighest}
-        />
-      }
-    />
-  );
-}
+type NumericKey = 'thresholdDeg' | 'graceSeconds' | 'volume';
 
 /**
- * Ajustes en una hoja inferior de Material 3: asa de arrastre, título grande y
- * las opciones agrupadas en secciones con filas de lista.
+ * Ajustes en una hoja de cristal al estilo de iOS: asa de arrastre, título
+ * centrado con «Listo» a la derecha y las opciones en grupos con su nota al
+ * pie, como en la app Ajustes.
  */
 export function SettingsSheet({
   visible,
@@ -96,156 +32,147 @@ export function SettingsSheet({
   onClearHistory,
   onClose,
 }: Props) {
-  const bump = (key: 'thresholdDeg' | 'graceSeconds' | 'volume', direction: 1 | -1) => {
+  const insets = useSafeAreaInsets();
+
+  const bump = (key: NumericKey, direction: 1 | -1) => {
     const limits = LIMITS[key];
-    onChange({ [key]: clamp(settings[key] + direction * limits.step, limits.min, limits.max) });
+    // Redondeo al paso: 0,1 + 0,2 no debe acabar en 0,30000000000000004.
+    const next = Math.round((settings[key] + direction * limits.step) / limits.step) * limits.step;
+    onChange({ [key]: clamp(Number(next.toFixed(3)), limits.min, limits.max) });
   };
 
+  const stepper = (key: NumericKey, label: string, value: string) => (
+    <View style={styles.stepperRow}>
+      <Text style={styles.value}>{value}</Text>
+      <Stepper
+        label={label}
+        onDecrease={() => bump(key, -1)}
+        onIncrease={() => bump(key, 1)}
+        canDecrease={settings[key] > LIMITS[key].min}
+        canIncrease={settings[key] < LIMITS[key].max}
+      />
+    </View>
+  );
+
+  const toggle = (key: 'easWithHeadphones' | 'easAlways' | 'voiceEnabled' | 'manualHeadphones' | 'vibrationEnabled' | 'notificationsEnabled' | 'keepAwake' | 'controlMode', label: string) => (
+    <Toggle value={settings[key]} onValueChange={(next) => onChange({ [key]: next })} accessibilityLabel={label} />
+  );
+
+  const confirmClear = () =>
+    Alert.alert(
+      '¿Borrar el historial?',
+      `Se eliminarán las ${sessionCount} sesiones guardadas y los resultados del experimento. No se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Borrar', style: 'destructive', onPress: onClearHistory },
+      ]
+    );
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.scrim}>
-        <View style={styles.sheet}>
-          <View style={styles.handleArea}>
-            <View style={styles.handle} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar ajustes" />
+        <GlassSurface material="thick" cornerRadius={radius.extraLarge} style={styles.sheet}>
+          <View style={styles.grabberArea}>
+            <View style={styles.grabber} />
           </View>
 
           <View style={styles.header}>
-            <Text style={styles.title}>Ajustes</Text>
-            <Button label="Listo" onPress={onClose} variant="text" accessibilityLabel="Cerrar ajustes" />
+            <View style={styles.headerSide} />
+            <Text style={styles.title} accessibilityRole="header">
+              Ajustes
+            </Text>
+            <View style={[styles.headerSide, styles.headerRight]}>
+              <Button label="Listo" onPress={onClose} variant="plain" size="small" accessibilityLabel="Cerrar ajustes" />
+            </View>
           </View>
 
-          <ScrollView contentContainerStyle={styles.content}>
-            <Subheader>Sensibilidad</Subheader>
-            <Stepper
-              label="Umbral de agachado"
-              hint="Grados de inclinación que disparan la alerta."
-              value={`${Math.round(settings.thresholdDeg)}°`}
-              onDecrease={() => bump('thresholdDeg', -1)}
-              onIncrease={() => bump('thresholdDeg', 1)}
-            />
-            <Divider />
-            <Stepper
-              label="Margen antes del pitido"
-              hint="Cuánto puedes estar agachado antes del susto."
-              value={`${settings.graceSeconds.toFixed(1)} s`}
-              onDecrease={() => bump('graceSeconds', -1)}
-              onIncrease={() => bump('graceSeconds', 1)}
-            />
-
-            <Subheader>Sonido</Subheader>
-            <Stepper
-              label="Volumen de las alertas"
-              value={`${Math.round(settings.volume * 100)}%`}
-              onDecrease={() => bump('volume', -1)}
-              onIncrease={() => bump('volume', 1)}
-            />
-            <Divider />
-            <Toggle
-              label="Tono EAS con auriculares"
-              hint="El aviso de emergencia (853 + 960 Hz) directo a los oídos."
-              value={settings.easWithHeadphones}
-              onValueChange={(easWithHeadphones) => onChange({ easWithHeadphones })}
-            />
-            <Toggle
-              label="Tono EAS siempre"
-              hint="Úsalo también por el altavoz, en vez de la sirena."
-              value={settings.easAlways}
-              onValueChange={(easAlways) => onChange({ easAlways })}
-            />
-            <Toggle
-              label="Voz (uno, dos, tres)"
-              value={settings.voiceEnabled}
-              onValueChange={(voiceEnabled) => onChange({ voiceEnabled })}
-            />
-            {detectionAvailable ? null : (
-              <Toggle
-                label="Llevo auriculares"
-                hint="Esta build no detecta la salida de audio: márcalo a mano."
-                value={settings.manualHeadphones}
-                onValueChange={(manualHeadphones) => onChange({ manualHeadphones })}
+          <ScrollView
+            contentContainerStyle={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}
+            showsVerticalScrollIndicator={false}>
+            <ListGroup
+              header="Sensibilidad"
+              footer="El umbral son los grados que te puedes inclinar respecto a la postura calibrada; el margen, cuánto aguantas así antes del pitido.">
+              <ListRow
+                title="Umbral de agachado"
+                accessory={stepper('thresholdDeg', 'el umbral', `${Math.round(settings.thresholdDeg)}°`)}
               />
-            )}
+              <ListRow
+                title="Margen antes del pitido"
+                accessory={stepper('graceSeconds', 'el margen', `${settings.graceSeconds.toFixed(1).replace('.', ',')} s`)}
+              />
+            </ListGroup>
 
-            <Subheader>Avisos</Subheader>
-            <Toggle
-              label="Vibración"
-              value={settings.vibrationEnabled}
-              onValueChange={(vibrationEnabled) => onChange({ vibrationEnabled })}
-            />
-            <Toggle
-              label="Notificación de alerta"
-              hint="Mensaje de máxima prioridad al llegar a la alarma."
-              value={settings.notificationsEnabled}
-              onValueChange={(notificationsEnabled) => onChange({ notificationsEnabled })}
-            />
-            <Toggle
-              label="Mantener la pantalla encendida"
-              hint="El sensor se para si el móvil se bloquea."
-              value={settings.keepAwake}
-              onValueChange={(keepAwake) => onChange({ keepAwake })}
-            />
-
-            <Subheader>Experimento</Subheader>
-            <Toggle
-              label="Sesión de control"
-              hint="Mide y registra sin avisar. Es el grupo con el que comparar."
-              value={settings.controlMode}
-              onValueChange={(controlMode) => onChange({ controlMode })}
-            />
-            {sessionCount > 0 ? (
-              <View style={styles.dangerRow}>
-                <Button
-                  label={`Borrar las ${sessionCount} sesiones guardadas`}
-                  onPress={onClearHistory}
-                  variant="outlined"
-                  color={colors.error}
-                  stretch
+            <ListGroup
+              header="Sonido"
+              footer="Con auriculares suena el tono de emergencia EAS (853 + 960 Hz) directo a los oídos; por el altavoz, una sirena de dos tonos.">
+              <ListRow title="Volumen" accessory={stepper('volume', 'el volumen', `${Math.round(settings.volume * 100)} %`)} />
+              <ListRow title="Tono EAS con auriculares" accessory={toggle('easWithHeadphones', 'Tono EAS con auriculares')} />
+              <ListRow title="Tono EAS siempre" subtitle="También por el altavoz" accessory={toggle('easAlways', 'Tono EAS siempre')} />
+              <ListRow title="Voz: uno, dos, tres" accessory={toggle('voiceEnabled', 'Voz')} />
+              {detectionAvailable ? null : (
+                <ListRow
+                  title="Llevo auriculares"
+                  subtitle="Esta versión no los detecta sola"
+                  accessory={toggle('manualHeadphones', 'Llevo auriculares')}
                 />
-              </View>
+              )}
+            </ListGroup>
+
+            <ListGroup
+              header="Avisos"
+              footer="Con la pantalla bloqueada el sistema apaga el acelerómetro: mantenerla encendida es lo que deja vigilar sin tocar el móvil.">
+              <ListRow title="Vibración" accessory={toggle('vibrationEnabled', 'Vibración')} />
+              <ListRow title="Notificación de alerta" accessory={toggle('notificationsEnabled', 'Notificación de alerta')} />
+              <ListRow title="Mantener la pantalla encendida" accessory={toggle('keepAwake', 'Mantener la pantalla encendida')} />
+            </ListGroup>
+
+            <ListGroup
+              header="Experimento"
+              footer="Una sesión de control mide y registra igual, pero sin pitar, hablar ni vibrar. Es el grupo con el que comparar para saber si los avisos sirven.">
+              <ListRow title="Sesión de control" accessory={toggle('controlMode', 'Sesión de control')} />
+            </ListGroup>
+
+            {sessionCount > 0 ? (
+              <ListGroup>
+                <Pressable
+                  onPress={confirmClear}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.destructiveRow, pressed && styles.destructivePressed]}>
+                  <Text style={styles.destructive}>Borrar las {sessionCount} sesiones guardadas</Text>
+                </Pressable>
+              </ListGroup>
             ) : null}
           </ScrollView>
-        </View>
+        </GlassSurface>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  scrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderTopLeftRadius: shape.extraLarge,
-    borderTopRightRadius: shape.extraLarge,
-    maxHeight: '90%',
+    maxHeight: '92%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
-  handleArea: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.sm },
-  handle: {
-    width: 32,
-    height: 4,
-    borderRadius: shape.full,
-    backgroundColor: stateLayer(colors.onSurfaceVariant, 0.4),
-  },
+  grabberArea: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  grabber: { width: 36, height: 5, borderRadius: 3, backgroundColor: colors.tertiaryLabel },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: spacing.xl,
-    paddingRight: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
+    minHeight: 44,
   },
-  title: { ...type.headlineSmall, color: colors.onSurface },
-  content: { paddingBottom: spacing.xxl },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  stepButton: {
-    width: 40,
-    height: 40,
-    borderRadius: shape.full,
-    borderWidth: 1,
-    borderColor: colors.outline,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepGlyph: { ...type.titleLarge, color: colors.onSurface, lineHeight: 26 },
-  stepValue: { ...type.labelLarge, color: colors.onSurface, minWidth: 56, textAlign: 'center' },
-  dangerRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  headerSide: { flex: 1 },
+  headerRight: { alignItems: 'flex-end' },
+  title: { ...type.headline, color: colors.label },
+  content: { paddingHorizontal: spacing.lg, gap: spacing.xxl, paddingTop: spacing.sm },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  value: { ...type.body, ...roundedNumbers, color: colors.secondaryLabel, minWidth: 52, textAlign: 'right' },
+  destructiveRow: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
+  destructivePressed: { backgroundColor: colors.quaternaryFill },
+  destructive: { ...type.body, color: colors.red },
 });

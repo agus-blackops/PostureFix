@@ -1,149 +1,159 @@
-import type { TextStyle, ViewStyle } from 'react-native';
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
- * Tokens de Material Design 3 en tema oscuro, generados a partir del naranja de
- * PostureFix (#FF7A29) como color fuente. Los nombres son los roles de M3
- * (primary / onPrimary / primaryContainer…) para que cada componente pida el rol
- * que le toca en vez de un color suelto.
+ * Sistema de diseño de PostureFix 1.1.1: materiales de cristal al estilo de
+ * Apple (Liquid Glass en iOS 26, los «materials» de desenfoque en versiones
+ * anteriores) sobre un fondo casi negro que se tiñe con el estado de la postura.
  *
- * M3 no define un rol «correcto/incorrecto», así que se añaden dos familias
- * propias con la misma forma: `success` (postura bien) y `warning` (te estás
- * agachando). Así la app tiene un único vocabulario de color.
+ * Los nombres siguen a Apple: `label` / `secondaryLabel` para el texto, `fill`
+ * para los rellenos translúcidos, `separator` para las líneas finas y `tint`
+ * para el acento de la marca. Los colores de estado son los del sistema en modo
+ * oscuro (verde, amarillo, rojo), que ya están pensados para leerse sobre
+ * cristal.
  */
 export const colors = {
-  primary: '#FFB68F',
-  onPrimary: '#542100',
-  primaryContainer: '#78310A',
-  onPrimaryContainer: '#FFDBC8',
+  /** Fondo de la app: negro cálido, para que el cristal tenga algo que teñir. */
+  background: '#0A0706',
 
-  secondary: '#E7BFA8',
-  onSecondary: '#442B1B',
-  secondaryContainer: '#5D4130',
-  onSecondaryContainer: '#FFDBC8',
+  /** Acento de la marca: el naranja de siempre, sin rebajar. */
+  tint: '#FF7A29',
+  /** Texto sobre el acento: oscuro, que el blanco sobre naranja no se lee bien. */
+  onTint: '#1F0C02',
 
-  tertiary: '#CFC891',
-  onTertiary: '#353108',
-  tertiaryContainer: '#4C471D',
-  onTertiaryContainer: '#ECE4AB',
+  label: '#FFFFFF',
+  secondaryLabel: 'rgba(246, 236, 230, 0.64)',
+  tertiaryLabel: 'rgba(246, 236, 230, 0.38)',
+  quaternaryLabel: 'rgba(246, 236, 230, 0.2)',
 
-  error: '#FFB4AB',
-  onError: '#690005',
-  errorContainer: '#93000A',
-  onErrorContainer: '#FFDAD6',
+  separator: 'rgba(255, 240, 230, 0.12)',
 
-  success: '#6FDB94',
-  onSuccess: '#00391B',
-  successContainer: '#00522A',
-  onSuccessContainer: '#8BF8AE',
+  fill: 'rgba(130, 120, 118, 0.36)',
+  secondaryFill: 'rgba(130, 120, 118, 0.28)',
+  tertiaryFill: 'rgba(130, 120, 118, 0.2)',
+  quaternaryFill: 'rgba(130, 120, 118, 0.14)',
 
-  warning: '#F5BD4B',
-  onWarning: '#412D00',
-  warningContainer: '#5D4200',
-  onWarningContainer: '#FFDEA6',
+  /** Gris cálido de «en pausa»: no es verde porque no se está midiendo nada. */
+  neutral: '#A39890',
+  green: '#30D158',
+  yellow: '#FFD60A',
+  red: '#FF453A',
+  /** Texto oscuro sobre los colores de estado: todos pasan de 4,5:1. */
+  onStatus: '#141009',
 
-  surface: '#1A120D',
-  onSurface: '#F1DFD6',
-  onSurfaceVariant: '#D8C2B6',
-  surfaceContainerLowest: '#120B07',
-  surfaceContainerLow: '#221A15',
-  surfaceContainer: '#271E19',
-  surfaceContainerHigh: '#322823',
-  surfaceContainerHighest: '#3D332D',
+  /** Lo que se ve cuando no hay cristal (Android, web): un tono cálido traslúcido. */
+  glassFallback: 'rgba(44, 34, 29, 0.62)',
+  glassFallbackThick: 'rgba(34, 26, 22, 0.86)',
+  /** Filo de luz del cristal: el borde superior brilla más que el inferior. */
+  glassHighlight: 'rgba(255, 255, 255, 0.14)',
+  glassEdge: 'rgba(255, 255, 255, 0.06)',
 
-  outline: '#A08D82',
-  outlineVariant: '#53433B',
-
-  inverseSurface: '#F1DFD6',
-  inverseOnSurface: '#392E28',
-  scrim: '#000000',
+  scrim: 'rgba(0, 0, 0, 0.5)',
 } as const;
 
-/** Color de rol para cada fase del motor de alertas. */
+/** Color de estado para cada fase del motor de alertas. */
 export const phaseColors: Record<string, string> = {
-  idle: colors.onSurfaceVariant,
-  ok: colors.success,
-  slouching: colors.warning,
-  scare: colors.primary,
-  countdown: colors.primary,
-  alarm: colors.error,
-  cooldown: colors.success,
+  idle: colors.neutral,
+  ok: colors.green,
+  slouching: colors.yellow,
+  scare: colors.tint,
+  countdown: colors.tint,
+  alarm: colors.red,
+  cooldown: colors.green,
 };
 
-/** Escala de formas de M3: de la esquina apenas rota al contenedor de píldora. */
-export const shape = {
-  extraSmall: 4,
-  small: 8,
-  medium: 12,
-  large: 16,
-  extraLarge: 28,
-  full: 999,
+/**
+ * Esquinas continuas (la «squircle» de iOS): los radios van con
+ * `borderCurve: 'continuous'`, que Android ignora sin romper nada.
+ */
+export const radius = {
+  small: 10,
+  medium: 14,
+  large: 22,
+  extraLarge: 30,
+  capsule: 999,
 } as const;
 
-/** Rejilla de 4 dp de Material. */
+export const continuous: ViewStyle = { borderCurve: 'continuous' };
+
+/** Rejilla de 4 pt. */
 export const spacing = {
   xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
-  xxl: 32,
+  xl: 20,
+  xxl: 28,
+  xxxl: 36,
 } as const;
 
 /**
- * Elevación de M3. En Android la sombra la pinta el sistema con `elevation`; en
- * iOS hay que describirla, así que cada nivel lleva las dos recetas.
+ * Materiales de cristal, de más fino a más grueso, con su equivalencia en los
+ * materiales de UIKit para iOS < 26 y la intensidad del desenfoque.
  */
-export const elevation: Record<'level0' | 'level1' | 'level2' | 'level3', ViewStyle> = {
-  level0: {},
-  level1: {
-    elevation: 1,
-    shadowColor: colors.scrim,
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+export const materials = {
+  thin: { tint: 'systemThinMaterialDark', intensity: 60, fallback: colors.glassFallback },
+  regular: { tint: 'systemMaterialDark', intensity: 75, fallback: colors.glassFallback },
+  thick: { tint: 'systemThickMaterialDark', intensity: 90, fallback: colors.glassFallbackThick },
+  chrome: { tint: 'systemChromeMaterialDark', intensity: 90, fallback: colors.glassFallbackThick },
+} as const;
+
+export type MaterialName = keyof typeof materials;
+
+/** Sombra suave y amplia, la que usa iOS bajo las superficies flotantes. */
+export const shadow: Record<'soft' | 'floating', ViewStyle> = {
+  soft: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
-  level2: {
-    elevation: 3,
-    shadowColor: colors.scrim,
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  level3: {
-    elevation: 6,
-    shadowColor: colors.scrim,
-    shadowOpacity: 0.34,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+  floating: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 10,
   },
 };
 
 /**
- * Escala tipográfica de M3, recortada a los estilos que usa la app. Los pesos
- * van como literales para que TypeScript los acepte como `TextStyle`.
+ * Escala tipográfica de Apple (Dynamic Type, tamaño por defecto), con el
+ * tracking que aplica San Francisco a cada tamaño. En Android la misma escala
+ * cae en Roboto.
  */
 export const type = {
-  displayLarge: { fontSize: 57, lineHeight: 64, fontWeight: '400', letterSpacing: -0.25 },
-  displayMedium: { fontSize: 45, lineHeight: 52, fontWeight: '400' },
-  headlineMedium: { fontSize: 28, lineHeight: 36, fontWeight: '400' },
-  headlineSmall: { fontSize: 24, lineHeight: 32, fontWeight: '400' },
-  titleLarge: { fontSize: 22, lineHeight: 28, fontWeight: '500' },
-  titleMedium: { fontSize: 16, lineHeight: 24, fontWeight: '600', letterSpacing: 0.15 },
-  titleSmall: { fontSize: 14, lineHeight: 20, fontWeight: '600', letterSpacing: 0.1 },
-  bodyLarge: { fontSize: 16, lineHeight: 24, fontWeight: '400', letterSpacing: 0.5 },
-  bodyMedium: { fontSize: 14, lineHeight: 20, fontWeight: '400', letterSpacing: 0.25 },
-  bodySmall: { fontSize: 12, lineHeight: 16, fontWeight: '400', letterSpacing: 0.4 },
-  labelLarge: { fontSize: 14, lineHeight: 20, fontWeight: '600', letterSpacing: 0.1 },
-  labelMedium: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.5 },
-  labelSmall: { fontSize: 11, lineHeight: 16, fontWeight: '600', letterSpacing: 0.5 },
+  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: 0.37 },
+  title1: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 0.36 },
+  title2: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: 0.35 },
+  title3: { fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: 0.38 },
+  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.41 },
+  body: { fontSize: 17, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41 },
+  callout: { fontSize: 16, lineHeight: 21, fontWeight: '400', letterSpacing: -0.32 },
+  subheadline: { fontSize: 15, lineHeight: 20, fontWeight: '400', letterSpacing: -0.24 },
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400', letterSpacing: -0.08 },
+  caption1: { fontSize: 12, lineHeight: 16, fontWeight: '400', letterSpacing: 0 },
+  caption2: { fontSize: 11, lineHeight: 13, fontWeight: '400', letterSpacing: 0.07 },
 } satisfies Record<string, TextStyle>;
 
 /**
- * Capa de estado de M3: el color del contenido sobre el del contenedor con poca
- * opacidad (8 % al pasar por encima, 12 % al pulsar). Se devuelve en rgba para
- * poder superponerla sin tocar el color de fondo.
+ * Cifras grandes en la variante redondeada de San Francisco (la de Salud y
+ * Fitness) y con dígitos de ancho fijo para que no bailen al cambiar.
  */
-export function stateLayer(hex: string, opacity: number): string {
+export const roundedNumbers: TextStyle = {
+  fontVariant: ['tabular-nums'],
+  ...(Platform.OS === 'ios' ? { fontFamily: 'ui-rounded' } : null),
+};
+
+/** Muelles de animación: el rebote corto de iOS al pulsar y al cambiar de valor. */
+export const springs = {
+  press: { speed: 40, bounciness: 0 },
+  release: { speed: 22, bounciness: 8 },
+  value: { speed: 14, bounciness: 2 },
+} as const;
+
+/** Un color hexadecimal con otra opacidad, en rgba. */
+export function withAlpha(hex: string, opacity: number): string {
   const clean = hex.replace('#', '');
   const value = parseInt(clean.length === 3 ? clean.replace(/./g, (c) => c + c) : clean, 16);
   const r = (value >> 16) & 255;
@@ -151,6 +161,3 @@ export function stateLayer(hex: string, opacity: number): string {
   const b = value & 255;
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
-
-export const STATE_PRESSED = 0.12;
-export const STATE_HOVER = 0.08;

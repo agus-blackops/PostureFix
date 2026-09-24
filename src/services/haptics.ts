@@ -38,3 +38,19 @@ export async function fireHaptic(pattern: HapticPattern, enabled: boolean): Prom
 export function stopVibration(): void {
   Vibration.cancel();
 }
+
+export type UiFeedback = 'selection' | 'light' | 'medium';
+
+/**
+ * Toque suave al pulsar controles, como en las apps de iOS: `selection` para
+ * interruptores y pasos, `light` / `medium` para los botones. Respeta el ajuste
+ * de vibración igual que las alertas.
+ */
+export function uiFeedback(kind: UiFeedback, enabled: boolean): void {
+  if (!enabled) return;
+  const feedback =
+    kind === 'selection'
+      ? Haptics.selectionAsync()
+      : Haptics.impactAsync(kind === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+  feedback.catch(() => undefined);
+}

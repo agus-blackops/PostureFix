@@ -1,5 +1,76 @@
 # Cambios
 
+## 1.1.1
+
+Rediseño al estilo de Apple y una tanda de arreglos de calidad. Se mide y se
+avisa igual que en la 1.1.0.
+
+**Aspecto**
+
+- **Materiales de cristal.** Tarjetas, botones y ajustes son ahora de cristal.
+  En iOS 26 se usa Liquid Glass de verdad (`expo-glass-effect`). En iOS anterior
+  se usan los materiales de desenfoque del sistema (`expo-blur`). En Android se
+  pinta un cristal translúcido con su filo de luz. En la versión de portátil es
+  `backdrop-filter`.
+- **El fondo se tiñe con la postura.** Sobre un negro cálido hay dos
+  resplandores. El de arriba es siempre el naranja de la marca. El de abajo pasa
+  con un fundido a verde, amarillo o rojo según el estado.
+- **Anillo al estilo de Actividad.** El medidor es un anillo que se llena con la
+  inclinación, con extremos redondeados y una marca blanca en el umbral. En el
+  móvil está hecho sin SVG, con dos semianillos que giran. En el portátil es un
+  SVG.
+- **Tipografía y colores de Apple.** Se usa la escala de Dynamic Type (título
+  grande de 34 pt, cuerpo de 17 pt…) con San Francisco redondeada para las
+  cifras. Los colores de estado son los del sistema (verde, amarillo y rojo). El
+  acento vuelve a ser el naranja de la marca (#FF7A29), con texto oscuro encima
+  para que se lea.
+- **Ajustes como en iOS.** Son grupos con cabecera y nota al pie, «steppers» de
+  − y +, interruptores de iOS y una hoja con asa y «Listo». En el portátil hay
+  además deslizadores que pintan el tramo recorrido y un control segmentado para
+  la precisión del detector.
+- **Botones que responden.** Se encogen al pulsar y vuelven con un rebote corto.
+  En el móvil dan un toque háptico suave, que respeta el ajuste de vibración.
+
+**Experiencia de uso**
+
+- «Antes de empezar» es ahora una lista de tres pasos numerados.
+- Mientras te agachas, la app dice cuánto falta para el pitido («Pitido en
+  1,4 s») en vez de solo enseñar una barra.
+- **La calibración ya no falla en silencio.** Si no junta lecturas fiables
+  porque te movías, lo dice y ofrece repetir.
+- No se puede calibrar dos veces a la vez, ni empezar a vigilar a mitad de una
+  calibración. La prueba de la alerta tampoco se solapa consigo misma. Los
+  botones se apagan y dicen qué está pasando («Calibrando… 3/8», «Sonando…»).
+- Borrar el historial en el móvil pide confirmación, como ya hacía el portátil.
+- Los «steppers» se apagan al llegar a su límite, en vez de aceptar toques que
+  no hacen nada.
+- **Portátil.**
+  - Mientras la cámara está apagada, un recuadro explica que se enciende al
+    calibrar.
+  - El título grande se recoge en la barra de cristal al desplazarse.
+  - «Resultados» ocupa el hueco bajo la cámara en pantallas anchas.
+  - Hay atajos de teclado: Espacio empieza o para, C calibra y P prueba la
+    alerta.
+- Más accesibilidad: el medidor y los avisos se anuncian al lector de pantalla,
+  y los botones llevan su pista de lo que hacen.
+
+**Calidad**
+
+- **Ajustes corruptos.** Los ajustes guardados se validan campo a campo.
+  - En el portátil, un volumen corrupto llegaba como `NaN` al audio.
+  - En los dos, un sí/no guardado como texto (`"false"`) se tomaba por
+    verdadero.
+  - Ahora cada valor raro vuelve a su valor por defecto (`src/core/validate.ts`).
+- **Formatos compartidos.** Duraciones, porcentajes y grados se formatean en un
+  solo sitio (`src/core/format.ts`), en vez de en dos copias. Los segundos van
+  con dos cifras («3 min 05s»), las sesiones largas pasan a horas
+  («1 h 02 min») y los porcentajes llevan coma decimal.
+- **Pasos exactos.** El paso de los ajustes numéricos se redondea: bajar el
+  volumen de 5 en 5 ya no guarda valores como 0,9000000000000001.
+- **Descarga del CSV.** El enlace temporal se libera un segundo después en vez
+  de en el mismo instante, que en algunos navegadores cancelaba la descarga.
+- 25 tests nuevos (95 en total).
+
 ## 1.1.0
 
 Versión de aspecto: la app pasa a Material Design 3 de arriba abajo, con los

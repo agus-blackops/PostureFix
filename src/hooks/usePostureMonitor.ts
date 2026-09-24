@@ -69,6 +69,10 @@ export interface PostureMonitor {
   calibration: CalibrationState;
   /** Calidad de la última calibración, o `null` si nunca se calibró. */
   calibrationQuality: CalibrationQuality | null;
+  /** `true` si el último intento de calibrar no juntó lecturas fiables. */
+  calibrationFailed: boolean;
+  /** `true` mientras suena la prueba de la alerta. */
+  previewing: boolean;
   /** `true` cuando parece que el móvil se ha movido de sitio. */
   sensorMoved: boolean;
   /** Descarta el aviso de sensor movido sin recalibrar. */
@@ -94,6 +98,8 @@ export function usePostureMonitor(): PostureMonitor {
   const [calibration, setCalibration] = useState<CalibrationState>('none');
   const [calibrationQuality, setCalibrationQuality] = useState<CalibrationQuality | null>(null);
   const [sensorMoved, setSensorMoved] = useState(false);
+  const [calibrationFailed, setCalibrationFailed] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [history, setHistory] = useState<SessionRecord[]>([]);
 
   const headphones = useHeadphones(settings.manualHeadphones);
@@ -110,6 +116,9 @@ export function usePostureMonitor(): PostureMonitor {
   const historyRef = useRef<SessionRecord[]>(history);
   /** Inicio de la sesión en curso, para guardarla al parar. */
   const sessionStartedAtRef = useRef(0);
+  /** Evita dos calibraciones o dos pruebas a la vez (dos toques rápidos). */
+  const calibratingRef = useRef(false);
+  const previewingRef = useRef(false);
 
   engineRef.current = engine;
   settingsRef.current = settings;
@@ -311,17 +320,24 @@ export function usePostureMonitor(): PostureMonitor {
 
   /** Guarda la orientación actual del móvil como "espalda recta". */
   const calibrate = useCallback(async () => {
+    if (calibratingRef.current) return;
+    calibratingRef.current = true;
     setCalibration('calibrating');
+    setCalibrationFailed(false);
     calibrationSamplesRef.current = [];
 
     await new Promise((resolve) => setTimeout(resolve, CALIBRATION_MS));
 
     const samples = calibrationSamplesRef.current ?? [];
     calibrationSamplesRef.current = null;
+    calibratingRef.current = false;
 
     const calibracion = calibrateVectors(samples.filter((s) => isTrustedSample(s, MOTION_TOLERANCE_G)));
     if (!calibracion) {
+      // Antes fallaba en silencio: el botón volvía a su estado y no se sabía por qué.
       setCalibration(settingsRef.current.baseline ? 'done' : 'none');
+      setCalibrationFailed(true);
+      speak('No he podido calibrar. Quédate quieto y repite.', settingsRef.current.voiceEnabled);
       return;
     }
 
@@ -412,21 +428,29 @@ export function usePostureMonitor(): PostureMonitor {
 
   /** Prueba la secuencia completa sin tener que agacharse. */
   const previewAlarm = useCallback(async () => {
+    if (previewingRef.current) return;
+    previewingRef.current = true;
+    setPreviewing(true);
     const current = settingsRef.current;
     const audio = audioRef.current;
-    await audio?.prepare();
-    await audio?.playBeep(current.volume);
-    await fireHaptic('warning', current.vibrationEnabled);
-    for (let i = 0; i < MESSAGES.counts.length; i++) {
+    try {
+      await audio?.prepare();
+      await audio?.playBeep(current.volume);
+      await fireHaptic('warning', current.vibrationEnabled);
+      for (let i = 0; i < MESSAGES.counts.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, DEFAULT_ENGINE_CONFIG.countStepMs));
+        speak(MESSAGES.counts[i], current.voiceEnabled);
+      }
       await new Promise((resolve) => setTimeout(resolve, DEFAULT_ENGINE_CONFIG.countStepMs));
-      speak(MESSAGES.counts[i], current.voiceEnabled);
+      speak(MESSAGES.alarm, current.voiceEnabled);
+      await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), current.volume);
+      await fireHaptic('alarm', current.vibrationEnabled);
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+    } finally {
+      silence();
+      previewingRef.current = false;
+      setPreviewing(false);
     }
-    await new Promise((resolve) => setTimeout(resolve, DEFAULT_ENGINE_CONFIG.countStepMs));
-    speak(MESSAGES.alarm, current.voiceEnabled);
-    await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), current.volume);
-    await fireHaptic('alarm', current.vibrationEnabled);
-    await new Promise((resolve) => setTimeout(resolve, 3500));
-    silence();
   }, [pickAlarmSound, silence]);
 
   return {
@@ -438,6 +462,8 @@ export function usePostureMonitor(): PostureMonitor {
     sensorAvailable,
     calibration,
     calibrationQuality,
+    calibrationFailed,
+    previewing,
     sensorMoved,
     dismissSensorMoved,
     headphones,

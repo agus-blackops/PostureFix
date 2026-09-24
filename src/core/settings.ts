@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_ENGINE_CONFIG } from './postureEngine';
 import { sanitizeHistory, type SessionRecord } from './sessionLog';
 import type { Vector3 } from './orientation';
+import { clamp, readBoolean, readNumber } from './validate';
 
 const STORAGE_KEY = 'posturefix.settings.v1';
 const HISTORY_KEY = 'posturefix.history.v1';
@@ -56,25 +57,39 @@ export const LIMITS = {
   volume: { min: 0.2, max: 1, step: 0.05 },
 };
 
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+export { clamp };
 
-/** Normaliza lo leído de disco: descarta valores corruptos o fuera de rango. */
-export function sanitize(raw: Partial<Settings> | null | undefined): Settings {
-  const merged = { ...DEFAULT_SETTINGS, ...(raw ?? {}) };
-  const baseline = merged.baseline;
+/**
+ * Normaliza lo leído de disco: descarta valores corruptos o fuera de rango.
+ * Cada ajuste se valida por su tipo; un `"true"` guardado como texto o un
+ * volumen `NaN` vuelven a su valor por defecto en vez de colarse en la app.
+ */
+export function sanitize(raw: Partial<Record<keyof Settings, unknown>> | null | undefined): Settings {
+  const input = raw ?? {};
+  const baseline = input.baseline as Partial<Vector3> | null | undefined;
+  const flag = (key: BooleanSetting) => readBoolean(input[key], DEFAULT_SETTINGS[key]);
   return {
-    ...merged,
     baseline:
       baseline && [baseline.x, baseline.y, baseline.z].every((n) => typeof n === 'number' && Number.isFinite(n))
-        ? { x: baseline.x, y: baseline.y, z: baseline.z }
+        ? { x: baseline.x as number, y: baseline.y as number, z: baseline.z as number }
         : null,
-    thresholdDeg: clamp(Number(merged.thresholdDeg) || DEFAULT_SETTINGS.thresholdDeg, LIMITS.thresholdDeg.min, LIMITS.thresholdDeg.max),
-    graceSeconds: clamp(Number(merged.graceSeconds) || DEFAULT_SETTINGS.graceSeconds, LIMITS.graceSeconds.min, LIMITS.graceSeconds.max),
-    volume: clamp(Number(merged.volume) || DEFAULT_SETTINGS.volume, LIMITS.volume.min, LIMITS.volume.max),
+    thresholdDeg: readNumber(input.thresholdDeg, DEFAULT_SETTINGS.thresholdDeg, LIMITS.thresholdDeg.min, LIMITS.thresholdDeg.max),
+    graceSeconds: readNumber(input.graceSeconds, DEFAULT_SETTINGS.graceSeconds, LIMITS.graceSeconds.min, LIMITS.graceSeconds.max),
+    volume: readNumber(input.volume, DEFAULT_SETTINGS.volume, LIMITS.volume.min, LIMITS.volume.max),
+    easWithHeadphones: flag('easWithHeadphones'),
+    easAlways: flag('easAlways'),
+    voiceEnabled: flag('voiceEnabled'),
+    vibrationEnabled: flag('vibrationEnabled'),
+    notificationsEnabled: flag('notificationsEnabled'),
+    keepAwake: flag('keepAwake'),
+    manualHeadphones: flag('manualHeadphones'),
+    controlMode: flag('controlMode'),
   };
 }
+
+type BooleanSetting = {
+  [K in keyof Settings]: Settings[K] extends boolean ? K : never;
+}[keyof Settings];
 
 export async function loadSettings(): Promise<Settings> {
   try {

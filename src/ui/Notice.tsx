@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Button } from './material';
-import { colors, shape, spacing, type } from './theme';
+import { Button, Card } from './glass';
+import { colors, spacing, type, withAlpha } from './theme';
 
 interface Accion {
   label: string;
@@ -15,43 +15,56 @@ interface Props {
   actions?: Accion[];
 }
 
+const TONE = {
+  warn: { color: colors.yellow, glyph: '!' },
+  danger: { color: colors.red, glyph: '!' },
+} as const;
+
 /**
- * Aviso con acciones (sensor movido, calibración inestable) con la forma del
- * banner de Material 3: contenedor de color del rol, texto encima y los botones
- * de texto alineados a la derecha.
+ * Aviso con acciones (sensor movido, calibración floja o fallida): cristal
+ * teñido del color del aviso, un distintivo redondo a la izquierda y los
+ * botones abajo, la primera acción destacada.
  */
 export function Notice({ tone, title, body, actions = [] }: Props) {
-  const container = tone === 'danger' ? colors.errorContainer : colors.warningContainer;
-  const onContainer = tone === 'danger' ? colors.onErrorContainer : colors.onWarningContainer;
+  const { color, glyph } = TONE[tone];
 
   return (
-    <View style={[styles.banner, { backgroundColor: container }]}>
-      <Text style={[styles.title, { color: onContainer }]}>{title}</Text>
-      <Text style={[styles.body, { color: onContainer }]}>{body}</Text>
+    <Card tintColor={withAlpha(color, 0.12)} style={styles.card}>
+      <View style={styles.header} accessible accessibilityRole="alert" accessibilityLabel={`${title}. ${body}`}>
+        <View style={[styles.badge, { backgroundColor: color }]}>
+          <Text style={styles.badgeGlyph}>{glyph}</Text>
+        </View>
+        <View style={styles.text}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.body}>{body}</Text>
+        </View>
+      </View>
       {actions.length > 0 ? (
         <View style={styles.actions}>
-          {actions.map((accion) => (
+          {actions.map((accion, index) => (
             <Button
               key={accion.label}
               label={accion.label}
               onPress={accion.onPress}
-              variant="text"
-              color={onContainer}
+              size="small"
+              variant={index === 0 ? 'prominent' : 'glass'}
+              color={index === 0 ? color : undefined}
+              onColor={colors.onStatus}
             />
           ))}
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  banner: {
-    borderRadius: shape.large,
-    padding: spacing.lg,
-    gap: spacing.xs,
-  },
-  title: { ...type.titleMedium },
-  body: { ...type.bodyMedium, opacity: 0.92 },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
+  card: { gap: spacing.md },
+  header: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  badge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  badgeGlyph: { ...type.headline, color: colors.onStatus, fontWeight: '800' },
+  text: { flex: 1, gap: 2 },
+  title: { ...type.headline, color: colors.label },
+  body: { ...type.subheadline, color: colors.secondaryLabel },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: spacing.sm },
 });

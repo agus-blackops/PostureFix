@@ -1,6 +1,7 @@
 import { sanitizeHistory, type SessionRecord } from '../../src/core/sessionLog';
 import type { ModelQuality } from './detector';
 import type { PostureMetrics } from './postureVision';
+import { readBoolean, readChoice, readNumber } from '../../src/core/validate';
 
 const STORAGE_KEY = 'posturefix.web.v1';
 const HISTORY_KEY = 'posturefix.web.history.v1';
@@ -49,26 +50,40 @@ export const LIMITS = {
   fps: { min: 5, max: 30 },
 };
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
-function sanitize(raw: Partial<WebSettings> | null): WebSettings {
-  const merged = { ...DEFAULT_SETTINGS, ...(raw ?? {}) };
-  const baseline = merged.baseline;
+/**
+ * Normaliza lo leído de `localStorage`. Cada ajuste se valida por su tipo: un
+ * volumen corrupto antes llegaba como `NaN` al audio y un sí/no guardado como
+ * texto se tomaba por verdadero.
+ */
+export function sanitize(raw: Partial<Record<keyof WebSettings, unknown>> | null | undefined): WebSettings {
+  const input = raw ?? {};
+  const baseline = input.baseline as Record<string, unknown> | null | undefined;
   const validBaseline =
-    baseline &&
-    ['shoulderWidth', 'headLift', 'shoulderY', 'tiltDeg'].every(
-      (key) => Number.isFinite((baseline as unknown as Record<string, number>)[key])
-    );
+    !!baseline &&
+    typeof baseline === 'object' &&
+    ['shoulderWidth', 'headLift', 'shoulderY', 'tiltDeg'].every((key) => {
+      const value = baseline[key];
+      return typeof value === 'number' && Number.isFinite(value);
+    });
+  const flag = (key: BooleanSetting) => readBoolean(input[key], DEFAULT_SETTINGS[key]);
   return {
-    ...merged,
-    baseline: validBaseline ? baseline : null,
-    thresholdDeg: clamp(Number(merged.thresholdDeg) || DEFAULT_SETTINGS.thresholdDeg, LIMITS.thresholdDeg.min, LIMITS.thresholdDeg.max),
-    graceSeconds: clamp(Number(merged.graceSeconds) || DEFAULT_SETTINGS.graceSeconds, LIMITS.graceSeconds.min, LIMITS.graceSeconds.max),
-    volume: clamp(Number(merged.volume), LIMITS.volume.min, LIMITS.volume.max),
-    fps: clamp(Number(merged.fps) || DEFAULT_SETTINGS.fps, LIMITS.fps.min, LIMITS.fps.max),
-    modelQuality: merged.modelQuality === 'lite' ? 'lite' : 'full',
+    baseline: validBaseline ? (baseline as unknown as PostureMetrics) : null,
+    thresholdDeg: readNumber(input.thresholdDeg, DEFAULT_SETTINGS.thresholdDeg, LIMITS.thresholdDeg.min, LIMITS.thresholdDeg.max),
+    graceSeconds: readNumber(input.graceSeconds, DEFAULT_SETTINGS.graceSeconds, LIMITS.graceSeconds.min, LIMITS.graceSeconds.max),
+    volume: readNumber(input.volume, DEFAULT_SETTINGS.volume, LIMITS.volume.min, LIMITS.volume.max),
+    fps: Math.round(readNumber(input.fps, DEFAULT_SETTINGS.fps, LIMITS.fps.min, LIMITS.fps.max)),
+    headphones: flag('headphones'),
+    easAlways: flag('easAlways'),
+    voiceEnabled: flag('voiceEnabled'),
+    notificationsEnabled: flag('notificationsEnabled'),
+    controlMode: flag('controlMode'),
+    modelQuality: readChoice(input.modelQuality, ['full', 'lite'] as const, DEFAULT_SETTINGS.modelQuality),
   };
 }
+
+type BooleanSetting = {
+  [K in keyof WebSettings]: WebSettings[K] extends boolean ? K : never;
+}[keyof WebSettings];
 
 export function loadSettings(): WebSettings {
   try {

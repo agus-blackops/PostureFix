@@ -285,11 +285,11 @@ function downscale(canvas, size) {
   return out;
 }
 
-// Roles de Material 3 (los mismos de src/ui/theme.ts): el fondo es `surface`
-// con un degradado hacia `surfaceContainerHighest` y el trazo, `primary`.
-const SURFACE = [26, 18, 13];
-const SURFACE_TOP = [61, 51, 45];
-const PRIMARY = [255, 182, 143, 1];
+// Colores de src/ui/theme.ts: el fondo negro cálido con el resplandor naranja
+// de la marca arriba, como la app, y el trazo en el acento (`tint`).
+const SURFACE = [10, 7, 6];
+const SURFACE_TOP = [82, 38, 14];
+const PRIMARY = [255, 122, 41, 1];
 const WHITE = [255, 255, 255, 1];
 
 function buildIcons() {
