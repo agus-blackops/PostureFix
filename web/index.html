@@ -58,8 +58,21 @@
         --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
         --font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", system-ui, sans-serif;
 
-        /* El muelle corto de iOS al soltar un botón. */
-        --spring: cubic-bezier(0.3, 1.5, 0.5, 1);
+        /* Muelles de Material 3 Expressive (src/core/spring.ts). El script
+           los sustituye por curvas linear() con la física exacta; estas son
+           las aproximaciones para navegadores que no entienden linear(). */
+        --spatial-fast: cubic-bezier(0.3, 1.6, 0.5, 1);
+        --spatial-fast-ms: 350ms;
+        --spatial-default: cubic-bezier(0.3, 1.35, 0.5, 1);
+        --spatial-default-ms: 500ms;
+        --spatial-slow: cubic-bezier(0.3, 1.25, 0.5, 1);
+        --spatial-slow-ms: 650ms;
+        --effects-fast: cubic-bezier(0.2, 0, 0, 1);
+        --effects-fast-ms: 150ms;
+        --effects-default: cubic-bezier(0.2, 0, 0, 1);
+        --effects-default-ms: 200ms;
+        --effects-slow: cubic-bezier(0.2, 0, 0, 1);
+        --effects-slow-ms: 300ms;
 
         --glow: var(--neutral);
         transition: --glow 700ms ease;
@@ -194,23 +207,25 @@
         box-shadow: inset 0 0 0 1px var(--glass-edge);
       }
       .stage-empty .lens::after { content: ""; width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--tint); }
+      .stage-loader { width: 64px; height: 64px; }
       .stage-empty b { font: 600 17px/22px var(--font); }
       .stage-empty span { color: var(--secondary-label); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; max-width: 34ch; }
       #status { color: var(--secondary-label); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; margin: 12px 4px 0; min-height: 36px; }
 
       /* ---------------------------------------------------------- medidor --- */
       .gauge { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--neutral); padding: 8px 0 4px; }
-      .ring-wrap { position: relative; width: 228px; height: 228px; }
+      .ring-wrap { position: relative; width: 236px; height: 236px; }
       .ring { width: 100%; height: 100%; overflow: visible; }
       .ring-track { stroke: currentColor; opacity: 0.2; }
-      #ring-progress {
-        stroke: currentColor;
-        transform: rotate(-90deg);
-        transform-origin: 114px 114px;
-        transition: stroke-dashoffset 260ms var(--spring), opacity 160ms ease;
-      }
-      #ring-mark { transform-origin: 114px 114px; transition: transform 200ms ease; }
+      /* El tramo recorrido es la onda de Material 3 Expressive; la dibuja el
+         script (web/src/expressive.ts). */
+      #ring-wave { stroke: currentColor; transition: stroke var(--effects-default-ms) var(--effects-default); }
+      #ring-shape { fill: currentColor; opacity: 0.12; }
+      #ring-mark { transform-origin: 118px 118px; transition: transform var(--spatial-default-ms) var(--spatial-default); }
       .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .ring-loader { width: 60px; height: 60px; overflow: visible; }
+      .stage-loader { overflow: visible; }
+      .ring-loader path, .stage-loader path { fill: var(--tint); }
       #angle { font: 700 62px/68px var(--font-rounded); font-variant-numeric: tabular-nums; letter-spacing: -0.5px; color: var(--label); }
       .caption { color: var(--secondary-label); font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
 
@@ -242,20 +257,30 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        min-height: 48px;
+        /* Altura del botón: de ella salen sus esquinas, que cambian de forma
+           al pulsar (Material 3 Expressive) en vez de quedarse en píldora. */
+        --h: 48px;
+        min-height: var(--h);
         padding: 0 22px;
         border: 0;
-        border-radius: 999px;
+        border-radius: calc(var(--h) / 2);
         font: 600 17px/22px var(--font);
         letter-spacing: -0.41px;
         color: var(--label);
         background: transparent;
         cursor: pointer;
         user-select: none;
-        transition: transform 280ms var(--spring), filter 140ms ease, background-color 200ms ease, box-shadow 200ms ease;
+        transition:
+          transform var(--spatial-fast-ms) var(--spatial-fast),
+          border-radius var(--spatial-default-ms) var(--spatial-default),
+          flex-grow var(--spatial-default-ms) var(--spatial-default),
+          filter var(--effects-fast-ms) var(--effects-fast),
+          background-color var(--effects-default-ms) var(--effects-default),
+          color var(--effects-default-ms) var(--effects-default),
+          box-shadow var(--effects-default-ms) var(--effects-default);
       }
       .btn:hover:not(:disabled) { filter: brightness(1.1); }
-      .btn:active:not(:disabled) { transform: scale(0.96); transition-duration: 90ms; }
+      .btn:active:not(:disabled) { transform: scale(0.96); border-radius: calc(var(--h) * 0.32); }
       .btn:disabled { opacity: 0.4; cursor: default; }
       .btn-glass {
         background: var(--glass);
@@ -265,11 +290,18 @@
         box-shadow: var(--glass-highlight);
       }
       .btn-prominent { background: var(--tint); color: var(--on-tint); }
-      .btn-large { min-height: 56px; box-shadow: 0 12px 30px rgba(255, 122, 41, 0.35); }
-      #start.stop { background: var(--red); color: var(--on-status); box-shadow: 0 12px 30px rgba(255, 69, 58, 0.35); }
+      .btn-large { --h: 56px; box-shadow: 0 12px 30px rgba(255, 122, 41, 0.35); }
+      /* Seleccionado (vigilando), el botón principal deja de ser píldora. */
+      #start.stop {
+        background: var(--red);
+        color: var(--on-status);
+        border-radius: calc(var(--h) * 0.3);
+        box-shadow: 0 12px 30px rgba(255, 69, 58, 0.35);
+      }
+      #start.stop:active:not(:disabled) { border-radius: calc(var(--h) * 0.2); }
       .btn-plain { color: var(--tint); padding: 0 8px; }
       .btn-destructive { color: var(--red); }
-      .btn-small { min-height: 34px; padding: 0 16px; font-size: 15px; letter-spacing: -0.24px; }
+      .btn-small { --h: 34px; padding: 0 16px; font-size: 15px; letter-spacing: -0.24px; }
       kbd {
         font: 600 11px/1 var(--font-rounded);
         padding: 3px 6px;
@@ -281,6 +313,15 @@
       .actions { display: flex; flex-direction: column; gap: 12px; }
       .row-buttons { display: flex; gap: 12px; }
       .row-buttons .btn { flex: 1; }
+
+      /* Grupo de botones conectado de Material 3 Expressive: pegados, con las
+         esquinas de dentro casi rectas. El pulsado se ensancha empujando al
+         vecino y redondea sus esquinas interiores. */
+      .button-group { display: flex; gap: 3px; }
+      .button-group .btn { flex: 1 1 0; min-width: 0; border-radius: 10px; }
+      .button-group .btn:first-child { border-top-left-radius: calc(var(--h) / 2); border-bottom-left-radius: calc(var(--h) / 2); }
+      .button-group .btn:last-child { border-top-right-radius: calc(var(--h) / 2); border-bottom-right-radius: calc(var(--h) / 2); }
+      .button-group .btn:active:not(:disabled) { flex-grow: 1.18; transform: none; border-radius: calc(var(--h) * 0.36); }
 
       /* ------------------------------------------------------- estadística --- */
       .stats { display: flex; border-radius: var(--radius-l); padding: 16px 0; }
@@ -377,7 +418,7 @@
         border-radius: 50%;
         background: #fff;
         box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.16);
-        transition: transform 200ms var(--spring);
+        transition: transform 200ms var(--spatial-default);
       }
       input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
       input[type="range"]::-moz-range-thumb { width: 28px; height: 28px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
@@ -405,7 +446,7 @@
         border-radius: 50%;
         background: #fff;
         box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25), 0 1px 1px rgba(0, 0, 0, 0.16);
-        transition: transform 300ms var(--spring);
+        transition: transform 300ms var(--spatial-default);
       }
       .switch:checked { background: var(--tint); }
       .switch:checked::after { transform: translateX(20px); }
@@ -435,7 +476,7 @@
       #valor-control { color: var(--yellow); }
       #valor-avisos { color: var(--green); }
       .comparativa-fila .barra { height: 10px; background: var(--tertiary-fill); border-radius: 999px; overflow: hidden; }
-      .comparativa-fila .barra i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width 400ms var(--spring); }
+      .comparativa-fila .barra i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width 400ms var(--spatial-default); }
       #barra-control { background: var(--yellow); }
       #barra-avisos { background: var(--green); }
       #conclusion { font-size: 16px; line-height: 21px; letter-spacing: -0.32px; margin: 4px 0 0; }
@@ -469,12 +510,29 @@
       .alert.alarm { background: var(--red); color: #1a0503; animation: flash-alarma 0.76s infinite; }
       .alert.alarm #alert-text { font: 800 clamp(40px, 8vw, 88px)/1.05 var(--font-display); letter-spacing: 0.5px; }
       #alert-body { font: 600 20px/26px var(--font); max-width: 32ch; }
+      #alert-text, #alert-body { position: relative; }
+      /* Detrás del texto, la forma de estallido de Material 3 Expressive. */
+      .alert-shape { position: absolute; width: min(70vmin, 420px); height: min(70vmin, 420px); overflow: visible; }
+      .alert-shape path { fill: currentColor; opacity: 0.1; }
       @keyframes flash-alarma { 0%, 100% { background-color: var(--red); } 50% { background-color: #ffe3e0; } }
       @keyframes flash-cuenta { 0%, 100% { background-color: var(--tint); } 50% { background-color: #ffd9c2; } }
+
+      /* ------------------------------------------------------ movimiento --- */
+      /* Entrada escalonada con el muelle espacial lento: cada bloque sube un
+         poco y aparece, uno detrás de otro (--i es su turno). */
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(22px) scale(0.97); }
+        to { opacity: 1; transform: none; }
+      }
+      .appear { animation: rise var(--spatial-slow-ms) var(--spatial-slow) both; animation-delay: calc(var(--i, 0) * 70ms); }
+      /* Rebote del estado cada vez que cambia. */
+      @keyframes pop { from { transform: scale(0.86); } to { transform: scale(1); } }
+      #phase.pop { animation: pop var(--spatial-fast-ms) var(--spatial-fast); }
 
       /* Quien pide menos movimiento se queda con el color, sin parpadeo. */
       @media (prefers-reduced-motion: reduce) {
         .alert { animation: none !important; }
+        .appear, #phase.pop { animation: none !important; }
         *, *::before, *::after { transition-duration: 1ms !important; }
       }
     </style>
@@ -486,20 +544,21 @@
     </header>
 
     <main>
-      <div class="large-title" id="large-title">
+      <div class="large-title appear" id="large-title" style="--i: 0">
         <h1>PostureFix</h1>
         <p>Versión para portátil: la webcam te vigila la espalda.</p>
       </div>
 
       <div class="layout">
-        <section class="card glass area-camera">
+        <section class="card glass area-camera appear" style="--i: 1">
           <div class="stage">
             <video id="video" playsinline muted></video>
             <canvas id="overlay"></canvas>
             <div id="stage-empty" class="stage-empty">
-              <div class="lens" aria-hidden="true"></div>
-              <b>La cámara se enciende al calibrar</b>
-              <span>Colócate de frente, con los hombros y las orejas a la vista. El vídeo se procesa aquí y no sale de este equipo.</span>
+              <div class="lens" id="stage-lens" aria-hidden="true"></div>
+              <svg class="stage-loader" id="stage-loader" viewBox="0 0 64 64" aria-hidden="true" hidden><path id="stage-loader-path" /></svg>
+              <b id="stage-title">La cámara se enciende al calibrar</b>
+              <span id="stage-text">Colócate de frente, con los hombros y las orejas a la vista. El vídeo se procesa aquí y no sale de este equipo.</span>
             </div>
           </div>
           <p id="status" role="status" aria-live="polite"></p>
@@ -515,17 +574,19 @@
         </section>
 
         <div class="column area-side">
-          <section class="card glass">
+          <section class="card glass appear" style="--i: 2">
             <div class="gauge" id="gauge">
               <div class="ring-wrap">
-                <svg class="ring" viewBox="0 0 228 228" aria-hidden="true">
-                  <circle class="ring-track" cx="114" cy="114" r="96" fill="none" stroke-width="20" />
-                  <circle id="ring-progress" cx="114" cy="114" r="96" fill="none" stroke-width="20" stroke-linecap="round" />
-                  <g id="ring-mark"><rect x="112.5" y="4" width="3" height="28" rx="1.5" fill="#fff" /></g>
+                <svg class="ring" viewBox="0 0 236 236" aria-hidden="true">
+                  <path id="ring-shape" />
+                  <circle class="ring-track" cx="118" cy="118" r="103.3" fill="none" stroke-width="16" />
+                  <path id="ring-wave" fill="none" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+                  <g id="ring-mark"><rect x="116.5" y="1.7" width="3" height="26" rx="1.5" fill="#fff" /></g>
                 </svg>
                 <div class="ring-center">
+                  <svg class="ring-loader" id="ring-loader" viewBox="0 0 60 60" hidden><path id="ring-loader-path" /></svg>
                   <div id="angle" aria-live="off">0°</div>
-                  <div class="caption">de inclinación</div>
+                  <div class="caption" id="angle-caption">de inclinación</div>
                 </div>
               </div>
               <div id="phase" role="status" aria-live="polite">En pausa</div>
@@ -538,23 +599,23 @@
             </div>
           </section>
 
-          <div class="actions">
-            <button id="start" type="button" class="btn btn-prominent btn-large" aria-keyshortcuts="Space">
+          <div class="actions appear" style="--i: 3">
+            <button id="start" type="button" class="btn btn-prominent btn-large" aria-keyshortcuts="Space" aria-pressed="false">
               Empezar a vigilar
             </button>
-            <div class="row-buttons">
+            <div class="button-group" role="group" aria-label="Calibración y prueba">
               <button id="calibrate" type="button" class="btn btn-glass" aria-keyshortcuts="C">Calibrar</button>
               <button id="test" type="button" class="btn btn-glass" aria-keyshortcuts="P">Probar alerta</button>
             </div>
           </div>
 
-          <div class="stats glass">
+          <div class="stats glass appear" style="--i: 4">
             <div class="stat"><b id="stat-alerts">0</b><span>alertas</span></div>
             <div class="stat"><b id="stat-bad">0s</b><span>encorvado</span></div>
             <div class="stat"><b id="stat-session">0s</b><span>sesión</span></div>
           </div>
 
-          <div>
+          <div class="appear" style="--i: 5">
             <div class="group-body glass">
               <div class="row">
                 <label for="set-control">
@@ -567,7 +628,7 @@
           </div>
         </div>
 
-        <section class="card glass area-results" id="historial">
+        <section class="card glass area-results appear" id="historial" style="--i: 3">
           <h2 class="card-title">Resultados</h2>
           <p class="card-subtitle">Tiempo que pasas encorvado, con avisos y sin ellos</p>
           <p id="historial-vacio">
@@ -602,7 +663,7 @@
       </div>
 
       <div class="settings">
-        <div class="settings-column">
+        <div class="settings-column appear" style="--i: 6">
           <div>
             <h3 class="group-header">Sensibilidad</h3>
             <div class="group-body glass">
@@ -648,7 +709,7 @@
           </div>
         </div>
 
-        <div class="settings-column">
+        <div class="settings-column appear" style="--i: 7">
           <div>
             <h3 class="group-header">Sonido y avisos</h3>
             <div class="group-body glass">
@@ -690,6 +751,7 @@
     </main>
 
     <div id="alert-overlay" class="alert hidden" aria-live="assertive">
+      <svg class="alert-shape" viewBox="0 0 340 340" aria-hidden="true"><path id="alert-shape" /></svg>
       <div id="alert-text"></div>
       <div id="alert-body"></div>
     </div>

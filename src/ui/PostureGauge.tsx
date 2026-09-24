@@ -2,7 +2,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { Phase } from '../core/postureEngine';
 import { formatDegrees } from '../core/format';
-import { BigNumber, ProgressBar, ProgressRing } from './glass';
+import { expressionFor } from '../core/expression';
+import { LoadingIndicator, MorphShape, Pop, WavyRing } from './expressive';
+import { BigNumber, ProgressBar } from './glass';
 import { colors, phaseColors, radius, spacing, type, withAlpha } from './theme';
 
 interface Props {
@@ -15,6 +17,8 @@ interface Props {
   graceSeconds: number;
   /** En una sesión de control se registra la mala postura sin anunciarla. */
   controlMode?: boolean;
+  /** Mientras se calibra, el centro enseña un indicador de carga. */
+  calibrating?: boolean;
 }
 
 /** Ángulo que llena el anillo entero. */
@@ -31,10 +35,11 @@ const PHASE_LABEL: Record<Phase, string> = {
 };
 
 /**
- * Indicador principal: un anillo al estilo de Actividad que se llena con la
- * inclinación, con una marca blanca en el umbral y la cifra en grande en el
- * centro. Debajo, el estado en una cápsula y, mientras te agachas, cuánto
- * falta para el pitido.
+ * Indicador principal: el anillo ondulado de Material 3 Expressive se llena
+ * con la inclinación y su onda crece con la urgencia; la marca blanca es el
+ * umbral. En el centro, la cifra sobre una forma que cambia con el estado.
+ * Debajo, el estado en una cápsula y, mientras te agachas, cuánto falta para
+ * el pitido.
  */
 export function PostureGauge({
   deviationDeg,
@@ -43,6 +48,7 @@ export function PostureGauge({
   graceProgress,
   graceSeconds,
   controlMode = false,
+  calibrating = false,
 }: Props) {
   const alerting = phase === 'scare' || phase === 'countdown' || phase === 'alarm';
   // En control no conviene ni el rótulo rojo: el usuario lo leería como aviso.
@@ -50,6 +56,7 @@ export function PostureGauge({
   const label = controlMode && alerting ? 'Mala postura registrada (sin avisar)' : PHASE_LABEL[phase];
   const graceLeft = Math.max(0, (1 - graceProgress) * graceSeconds);
   const showGrace = graceProgress > 0 && phase === 'slouching';
+  const { urgency, shape } = expressionFor(phase, controlMode);
 
   return (
     <View
@@ -57,23 +64,38 @@ export function PostureGauge({
       accessible
       accessibilityLabel={`Inclinación ${Math.round(deviationDeg)} grados, umbral ${Math.round(thresholdDeg)}. ${label}.`}
       accessibilityLiveRegion="polite">
-      <ProgressRing
-        size={228}
-        stroke={20}
+      <WavyRing
+        size={236}
+        stroke={16}
         progress={deviationDeg / MAX_ANGLE}
         color={color}
         trackColor={withAlpha(color, 0.18)}
-        markAt={thresholdDeg / MAX_ANGLE}>
-        <BigNumber color={colors.label} size={60}>
-          {formatDegrees(deviationDeg)}
-        </BigNumber>
-        <Text style={styles.caption}>de inclinación</Text>
-      </ProgressRing>
+        markAt={thresholdDeg / MAX_ANGLE}
+        urgency={urgency}>
+        <View style={styles.shape}>
+          <MorphShape shape={calibrating ? 'circle' : shape} size={148} color={withAlpha(color, 0.12)} spin={urgency * 0.25} />
+        </View>
+        {calibrating ? (
+          <>
+            <LoadingIndicator size={56} color={colors.tint} />
+            <Text style={styles.caption}>No te muevas…</Text>
+          </>
+        ) : (
+          <>
+            <BigNumber color={colors.label} size={60}>
+              {formatDegrees(deviationDeg)}
+            </BigNumber>
+            <Text style={styles.caption}>de inclinación</Text>
+          </>
+        )}
+      </WavyRing>
 
-      <View style={[styles.phase, { backgroundColor: withAlpha(color, 0.16) }]}>
-        <View style={[styles.phaseDot, { backgroundColor: color }]} />
-        <Text style={[styles.phaseLabel, { color }]}>{label}</Text>
-      </View>
+      <Pop trigger={label}>
+        <View style={[styles.phase, { backgroundColor: withAlpha(color, 0.16) }]}>
+          <View style={[styles.phaseDot, { backgroundColor: color }]} />
+          <Text style={[styles.phaseLabel, { color }]}>{label}</Text>
+        </View>
+      </Pop>
 
       {showGrace ? (
         <View style={styles.grace}>
@@ -94,6 +116,7 @@ export function PostureGauge({
 const styles = StyleSheet.create({
   container: { alignItems: 'center', gap: spacing.lg, width: '100%', paddingVertical: spacing.sm },
   caption: { ...type.subheadline, color: colors.secondaryLabel, marginTop: -2 },
+  shape: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   phase: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -139,9 +139,9 @@ sección *Artifacts* (caducan a los 90 días y piden sesión):
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-portable-1.1.1.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-1.1.1.exe` | Windows con instalador y acceso directo |
-| `PostureFix-1.1.1.AppImage` | Linux |
+| `PostureFix-portable-1.1.2.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-1.1.2.exe` | Windows con instalador y acceso directo |
+| `PostureFix-1.1.2.AppImage` | Linux |
 
 ### Construirla uno mismo
 
@@ -224,7 +224,7 @@ sonidos y los iconos que se versionan en `assets/`:
 
 ## Versiones
 
-`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.1.1**, la
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.1.2**, la
 que va a la feria.
 
 ## Panel para la feria
@@ -246,6 +246,10 @@ src/services/               audio, voz, vibración y notificaciones
 src/hooks/usePostureMonitor  une sensor + máquina de estados + avisos
 src/ui/theme.ts              diseño: colores, materiales de cristal, esquinas y tipografía
 src/ui/glass.tsx             componentes de cristal (botones, tarjetas, anillo, listas, ajustes)
+src/ui/expressive.tsx        Material 3 Expressive: anillo ondulado, formas, carga y entradas
+src/core/spring.ts           muelles de Material 3 Expressive para RN y CSS (con tests)
+src/core/shapes.ts           geometría de la onda y de las formas que se transforman (con tests)
+src/core/expression.ts       urgencia y forma de cada fase, igual en móvil y portátil
 src/core/format.ts           formatos compartidos: duraciones, porcentajes y grados
 src/core/validate.ts         lectura defensiva de los ajustes guardados
 src/ui/                      el resto de la interfaz
@@ -253,6 +257,7 @@ modules/headphones/          módulo nativo de detección de auriculares (Kotlin
 scripts/generate-assets.mjs  generador de sonidos e iconos
 web/                         versión para portátil: webcam + MediaPipe Pose
 web/src/postureVision.ts     medición de postura por webcam (con tests)
+web/src/expressive.ts        anillo, formas y muelles de la versión de portátil
 web/build.mjs                empaquetado con esbuild
 desktop/main.js              envoltorio de escritorio (Electron)
 docs/panel-feria.html        panel explicativo para el stand

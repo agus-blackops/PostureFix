@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { MOTION, rnSpring } from '../core/spring';
 import { uiFeedback, type UiFeedback } from '../services/haptics';
 import {
   colors,
@@ -182,13 +183,57 @@ export function AmbientBackground({ accent }: { accent: string }) {
 
 // -------------------------------------------------------------- botones ---
 
-/** Encogerse un poco al pulsar y volver con un rebote corto, como en iOS. */
+/** Encogerse un poco al pulsar y volver con un rebote corto. */
 function usePressScale() {
   const scale = useRef(new Animated.Value(1)).current;
   return {
     scale,
-    pressIn: () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, ...springs.press }).start(),
-    pressOut: () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...springs.release }).start(),
+    pressIn: () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, ...rnSpring(MOTION.spatialFast) }).start(),
+    pressOut: () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...rnSpring(MOTION.spatialDefault) }).start(),
+  };
+}
+
+/**
+ * Relleno de cristal sin forma propia: llena su contenedor, que es quien la
+ * recorta. Lo usan los botones, cuya forma se anima.
+ */
+function GlassFill({ material = 'thin' }: { material?: MaterialName }) {
+  if (LIQUID_GLASS) {
+    return <GlassView glassEffectStyle="regular" colorScheme="dark" isInteractive style={StyleSheet.absoluteFill} />;
+  }
+  const spec = materials[material];
+  if (Platform.OS === 'android') {
+    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: spec.fallback }]} />;
+  }
+  return <BlurView tint={spec.tint} intensity={spec.intensity} style={StyleSheet.absoluteFill} pointerEvents="none" />;
+}
+
+/**
+ * Forma animada de Material 3 Expressive: la esquina se cuadra al pulsar y el
+ * botón pasa de píldora a rectángulo redondeado cuando está seleccionado.
+ */
+function useShapeMorph(height: number, selected: boolean) {
+  const press = useRef(new Animated.Value(0)).current;
+  const rest = useRef(new Animated.Value(selected ? height * 0.3 : height / 2)).current;
+
+  useEffect(() => {
+    Animated.spring(rest, {
+      toValue: selected ? height * 0.3 : height / 2,
+      useNativeDriver: false,
+      ...rnSpring(MOTION.spatialDefault),
+    }).start();
+  }, [height, rest, selected]);
+
+  const radius = Animated.subtract(rest, Animated.multiply(press, height * 0.18)).interpolate({
+    inputRange: [0, height],
+    outputRange: [0, height],
+    extrapolate: 'clamp',
+  });
+
+  return {
+    radius,
+    pressIn: () => Animated.spring(press, { toValue: 1, useNativeDriver: false, ...rnSpring(MOTION.spatialFast) }).start(),
+    pressOut: () => Animated.spring(press, { toValue: 0, useNativeDriver: false, ...rnSpring(MOTION.spatialDefault) }).start(),
   };
 }
 
@@ -206,6 +251,8 @@ interface ButtonProps {
   /** Texto sobre el relleno de `prominent`. */
   onColor?: string;
   disabled?: boolean;
+  /** Estado seleccionado de un botón conmutable: cambia de forma. */
+  selected?: boolean;
   /** El botón ocupa todo el ancho que le deja su fila. */
   stretch?: boolean;
   accessibilityLabel?: string;
@@ -223,43 +270,18 @@ export function Button({
   color,
   onColor = colors.onTint,
   disabled = false,
+  selected = false,
   stretch = false,
   accessibilityLabel,
   accessibilityHint,
   haptic = 'light',
 }: ButtonProps) {
   const { scale, pressIn, pressOut } = usePressScale();
+  const height = BUTTON_HEIGHT[size];
+  const shape = useShapeMorph(height, selected);
   const fill = color ?? colors.tint;
   const textColor = variant === 'prominent' ? onColor : (color ?? (variant === 'plain' ? colors.tint : colors.label));
   const labelStyle = size === 'small' ? styles.labelSmall : type.headline;
-  const height = BUTTON_HEIGHT[size];
-
-  const label$ = (
-    <Text style={[labelStyle, styles.buttonLabel, { color: textColor }]} numberOfLines={1}>
-      {label}
-    </Text>
-  );
-
-  const body =
-    variant === 'glass' ? (
-      <GlassSurface
-        material="thin"
-        cornerRadius={radius.capsule}
-        interactive
-        style={[styles.buttonBody, { minHeight: height }, size === 'small' && styles.buttonBodySmall]}>
-        {label$}
-      </GlassSurface>
-    ) : (
-      <View
-        style={[
-          styles.buttonBody,
-          { minHeight: height },
-          size === 'small' && styles.buttonBodySmall,
-          variant === 'prominent' && { backgroundColor: fill },
-        ]}>
-        {label$}
-      </View>
-    );
 
   return (
     <Animated.View
@@ -274,15 +296,101 @@ export function Button({
           feedback(haptic);
           onPress();
         }}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
+        onPressIn={() => {
+          pressIn();
+          shape.pressIn();
+        }}
+        onPressOut={() => {
+          pressOut();
+          shape.pressOut();
+        }}
         disabled={disabled}
         hitSlop={size === 'small' ? 6 : 0}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={accessibilityHint}
-        accessibilityState={{ disabled }}>
-        {body}
+        accessibilityState={{ disabled, selected }}>
+        <Animated.View
+          style={[
+            styles.buttonBody,
+            { minHeight: height, borderRadius: shape.radius },
+            size === 'small' && styles.buttonBodySmall,
+            variant === 'prominent' && { backgroundColor: fill },
+            variant === 'glass' && styles.edge,
+          ]}>
+          {variant === 'glass' ? <GlassFill /> : null}
+          <Text style={[labelStyle, styles.buttonLabel, { color: textColor }]} numberOfLines={1}>
+            {label}
+          </Text>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+export interface GroupItem {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  accessibilityHint?: string;
+}
+
+/**
+ * Grupo de botones conectado de Material 3 Expressive: van pegados, con las
+ * esquinas de dentro casi rectas. El que se pulsa se ensancha empujando a su
+ * vecino y redondea sus esquinas interiores.
+ */
+export function ButtonGroup({ items }: { items: GroupItem[] }) {
+  return (
+    <View style={styles.buttonGroup}>
+      {items.map((item, index) => (
+        <GroupButton key={item.label} item={item} first={index === 0} last={index === items.length - 1} />
+      ))}
+    </View>
+  );
+}
+
+function GroupButton({ item, first, last }: { item: GroupItem; first: boolean; last: boolean }) {
+  const height = BUTTON_HEIGHT.regular;
+  const press = useRef(new Animated.Value(0)).current;
+  const animate = (toValue: number, token: 'spatialFast' | 'spatialDefault') =>
+    Animated.spring(press, { toValue, useNativeDriver: false, ...rnSpring(MOTION[token]) }).start();
+  const outer = height / 2;
+  const inner = press.interpolate({ inputRange: [0, 1], outputRange: [8, height * 0.36] });
+  const grow = press.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
+
+  return (
+    <Animated.View style={{ flexGrow: grow, flexShrink: 1, flexBasis: 0 }}>
+      <Pressable
+        onPress={() => {
+          feedback('light');
+          item.onPress();
+        }}
+        onPressIn={() => animate(1, 'spatialFast')}
+        onPressOut={() => animate(0, 'spatialDefault')}
+        disabled={item.disabled}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        accessibilityHint={item.accessibilityHint}
+        accessibilityState={{ disabled: !!item.disabled }}>
+        <Animated.View
+          style={[
+            styles.groupItem,
+            styles.edge,
+            {
+              minHeight: height,
+              borderTopLeftRadius: first ? outer : inner,
+              borderBottomLeftRadius: first ? outer : inner,
+              borderTopRightRadius: last ? outer : inner,
+              borderBottomRightRadius: last ? outer : inner,
+            },
+            item.disabled && styles.disabled,
+          ]}>
+          <GlassFill />
+          <Text style={[type.headline, styles.buttonLabel, { color: colors.label }]} numberOfLines={1}>
+            {item.label}
+          </Text>
+        </Animated.View>
       </Pressable>
     </Animated.View>
   );
@@ -479,97 +587,6 @@ export function ProgressBar({
   );
 }
 
-/**
- * Anillo de progreso al estilo de los anillos de Actividad, sin SVG: cada
- * mitad del círculo es un semianillo recortado que gira dentro de su mitad de
- * la caja. Lleva extremos redondeados y una marca en el umbral.
- */
-export function ProgressRing({
-  size,
-  stroke,
-  progress,
-  color,
-  trackColor,
-  markAt,
-  children,
-}: {
-  size: number;
-  stroke: number;
-  progress: number;
-  color: string;
-  trackColor: string;
-  markAt?: number;
-  children?: ReactNode;
-}) {
-  const target = clamp01(progress);
-  const value = useRef(new Animated.Value(target)).current;
-  useEffect(() => {
-    Animated.spring(value, { toValue: target, useNativeDriver: true, ...springs.value }).start();
-  }, [target, value]);
-
-  const half = size / 2;
-  const ring: ViewStyle = { width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: color };
-  const rightTurn = value.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '180deg', '180deg'], extrapolate: 'clamp' });
-  const leftTurn = value.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '0deg', '180deg'], extrapolate: 'clamp' });
-  const endTurn = value.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'], extrapolate: 'clamp' });
-  // Sin progreso no se pinta nada: evita el hilo de un píxel en la costura.
-  const rightVisible = value.interpolate({ inputRange: [0, 0.004], outputRange: [0, 1], extrapolate: 'clamp' });
-  const leftVisible = value.interpolate({ inputRange: [0.5, 0.504], outputRange: [0, 1], extrapolate: 'clamp' });
-  const cap: ViewStyle = {
-    position: 'absolute',
-    top: 0,
-    left: half - stroke / 2,
-    width: stroke,
-    height: stroke,
-    borderRadius: stroke / 2,
-    backgroundColor: color,
-  };
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <View style={[StyleSheet.absoluteFill, ring, { borderColor: trackColor }]} />
-
-      {/* Mitad derecha: el tramo de 0 a 180°. */}
-      <View style={[styles.ringHalf, { left: half, width: half, height: size }]}>
-        <Animated.View
-          style={[styles.ringTurn, { left: -half, width: size, height: size, opacity: rightVisible, transform: [{ rotate: rightTurn }] }]}>
-          <View style={[styles.ringHalf, { left: 0, width: half, height: size }]}>
-            <View style={ring} />
-          </View>
-        </Animated.View>
-      </View>
-
-      {/* Mitad izquierda: el tramo de 180 a 360°. */}
-      <View style={[styles.ringHalf, { left: 0, width: half, height: size }]}>
-        <Animated.View
-          style={[styles.ringTurn, { left: 0, width: size, height: size, opacity: leftVisible, transform: [{ rotate: leftTurn }] }]}>
-          <View style={[styles.ringHalf, { left: half, width: half, height: size }]}>
-            <View style={[ring, { marginLeft: -half }]} />
-          </View>
-        </Animated.View>
-      </View>
-
-      {/* Extremos redondeados: el de salida fijo arriba y el de llegada girando. */}
-      <Animated.View style={[cap, { opacity: rightVisible }]} />
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { opacity: rightVisible, transform: [{ rotate: endTurn }] }]}>
-        <View style={cap} />
-      </Animated.View>
-
-      {markAt == null ? null : (
-        <View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${clamp01(markAt) * 360}deg` }] }]}>
-          <View style={[styles.ringMark, { left: half - 1.5, height: stroke + 8, top: -4 }]} />
-        </View>
-      )}
-
-      <View style={[StyleSheet.absoluteFill, styles.ringCenter]}>{children}</View>
-    </View>
-  );
-}
-
 /** Cifra grande en San Francisco redondeada. */
 export function BigNumber({ children, color, size = 56 }: { children: ReactNode; color: string; size?: number }) {
   return (
@@ -597,10 +614,18 @@ const styles = StyleSheet.create({
   stretch: { flex: 1 },
   disabled: { opacity: 0.4 },
   buttonBody: {
-    borderRadius: radius.capsule,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    ...continuous,
+  },
+  buttonGroup: { flexDirection: 'row', gap: 3 },
+  groupItem: {
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   buttonBodySmall: { paddingHorizontal: spacing.lg },
   buttonLabel: { textAlign: 'center' },
@@ -650,8 +675,4 @@ const styles = StyleSheet.create({
   trackFill: { height: '100%' },
   trackMark: { position: 'absolute', width: 3, marginLeft: -1.5, height: '100%', borderRadius: 2, backgroundColor: colors.label },
 
-  ringHalf: { position: 'absolute', top: 0, overflow: 'hidden' },
-  ringTurn: { position: 'absolute', top: 0 },
-  ringMark: { position: 'absolute', width: 3, borderRadius: 2, backgroundColor: colors.label },
-  ringCenter: { alignItems: 'center', justifyContent: 'center' },
 });

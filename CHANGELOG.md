@@ -1,5 +1,70 @@
 # Cambios
 
+## 1.1.2
+
+Material 3 Expressive encima del cristal de la 1.1.1, animaciones nuevas y una
+tanda de arreglos de calidad. Se mide y se avisa igual que antes.
+
+**Material 3 Expressive**
+
+- **Anillo ondulado.** El tramo recorrido del medidor es la onda del indicador
+  de Expressive, y su altura dice cuánto urge: liso con la postura bien, ondas
+  suaves al agacharte y fuertes, y más rápidas, en la cuenta atrás y la alarma.
+  La pista se queda lisa y la marca blanca sigue señalando el umbral.
+- **Formas que se transforman.** Detrás de la cifra hay una forma que cambia
+  con el estado: círculo en pausa, «galleta» con la postura bien, flor al
+  asustarte y estallido en la alarma. Pasa de una a otra con un rebote. La
+  alarma a pantalla completa lleva un estallido enorme girando detrás del texto.
+- **Indicador de carga de Expressive.** Mientras se calibra, o mientras el
+  portátil enciende la cámara y carga el detector, una forma se va
+  transformando en la siguiente y gira, en vez de quedarse todo quieto.
+- **Botones que cambian de forma.** Al pulsarlos la cápsula se cuadra un poco.
+  El botón principal, cuando está vigilando, pasa a rectángulo redondeado: es
+  el estado «seleccionado» de un botón conmutable.
+- **Grupo de botones conectado.** «Calibrar» y «Probar alerta» van pegados, con
+  las esquinas de dentro casi rectas. El que pulsas se ensancha y empuja al
+  otro.
+- **Movimiento con muelles de verdad.** Todo lo que se mueve usa los tokens de
+  movimiento de Expressive, con su razón de amortiguamiento y su rigidez
+  (`src/core/spring.ts`). Hay muelles espaciales, que rebotan un poco, para
+  forma y posición, y muelles de efectos, que no rebotan, para color y opacidad.
+  En el portátil los mismos muelles se convierten en curvas CSS `linear()`.
+
+**Animaciones nuevas**
+
+- Las tarjetas entran escalonadas: suben un poco y aparecen, una detrás de otra.
+- La cápsula del estado da un pequeño rebote cada vez que cambia.
+- El anillo persigue la inclinación con un muelle en vez de saltar.
+- Todo se para si el sistema pide reducir el movimiento: en el móvil con el
+  ajuste de accesibilidad y en el portátil con `prefers-reduced-motion`.
+
+**Calidad**
+
+- **Móvil: menos redibujados.** La pantalla se redibujaba con cada lectura del
+  acelerómetro, 20 veces por segundo. Ahora lo hace como mucho 10 veces, y al
+  instante cuando cambia de fase. La máquina de estados sigue recibiendo todas
+  las lecturas; lo que baja es el gasto de batería.
+- **Móvil: el motor ya no puede retroceder.** El estado del motor se copiaba del
+  último pintado en cada render. Con el redibujado limitado, eso habría hecho
+  retroceder a la máquina una lectura. Ahora solo lo escribe quien lo cambia.
+- **Portátil: cambio de modelo.** Si el modelo nuevo no cargaba, la app se
+  quedaba sin detector y sin decir nada. Ahora sigue el de antes y lo avisa.
+  Además, un segundo cambio mientras cargaba el primero se ignoraba: el
+  detector se quedaba con un modelo distinto del que marcaban los ajustes.
+- **Portátil: arranque doble.** Empezar a vigilar y calibrar a la vez (o la
+  tecla C justo después de Empezar) abría dos cámaras y dos detectores. Ahora
+  esperan al mismo arranque.
+- **Portátil: error de cámara.** Si falla la cámara, el recuadro lo dice y
+  explica qué revisar, en vez de quedarse con «la cámara se enciende al
+  calibrar».
+- **Móvil: titular de la alarma.** Su tamaño sale del ancho de la pantalla, así
+  que cabe en una línea en cualquier móvil sin depender de ajustes que no todas
+  las plataformas respetan.
+- **Una sola tabla de urgencias.** La urgencia y la forma de cada fase viven en
+  un solo sitio (`src/core/expression.ts`), igual para el móvil y el portátil.
+- 28 tests nuevos (123 en total): física de los muelles, geometría de la onda y
+  de las formas, y la expresión de cada fase.
+
 ## 1.1.1
 
 Rediseño al estilo de Apple y una tanda de arreglos de calidad. Se mide y se

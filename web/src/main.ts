@@ -30,8 +30,11 @@ import {
   repositionStep,
   type RepositionState,
 } from '../../src/core/reposition';
+import { expressionFor } from '../../src/core/expression';
 import { formatDegrees, formatDuration, formatPercent } from '../../src/core/format';
+import { SHAPES } from '../../src/core/shapes';
 import { WebAlerts } from './alerts';
+import { LoadingIndicator, MorphingShape, WavyRing, installMotionTokens } from './expressive';
 import { createPoseLandmarker, startCamera, stopCamera, type ModelQuality } from './detector';
 import {
   CAUSE_LABEL,
@@ -97,9 +100,12 @@ const ROLE = {
   tint: '#FF7A29',
 } as const;
 
-/** Radio del anillo del medidor en el SVG, para calcular su perímetro. */
-const RING_RADIUS = 96;
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+/**
+ * Geometría del anillo en el SVG (viewBox de 236): trazo de 16 y hueco para
+ * que la onda más alta no se salga de la caja.
+ */
+const RING = { cx: 118, cy: 118, stroke: 16, maxAmplitude: 16 * 0.42, wavelength: 34 };
+const RING_RADIUS = RING.cx - RING.stroke / 2 - RING.maxAmplitude;
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -113,8 +119,18 @@ const ui = {
   angle: el('angle'),
   phase: el('phase'),
   cause: el('cause'),
-  ringProgress: el<HTMLElement>('ring-progress'),
+  ringWave: el('ring-wave') as unknown as SVGPathElement,
+  ringShape: el('ring-shape') as unknown as SVGPathElement,
   ringMark: el<HTMLElement>('ring-mark'),
+  ringLoader: el('ring-loader'),
+  ringLoaderPath: el('ring-loader-path') as unknown as SVGPathElement,
+  angleCaption: el('angle-caption'),
+  stageLens: el('stage-lens'),
+  stageLoader: el('stage-loader'),
+  stageLoaderPath: el('stage-loader-path') as unknown as SVGPathElement,
+  stageTitle: el('stage-title'),
+  stageText: el('stage-text'),
+  alertShape: el('alert-shape') as unknown as SVGPathElement,
   grace: el('grace'),
   graceRow: el('grace-row'),
   graceText: el('grace-text'),
@@ -197,6 +213,17 @@ let lastSeenAt = 0;
 let lastLandmarks: Landmark[] | null = null;
 /** `true` mientras la cámara ve bien a la persona. */
 let visible = false;
+
+// Piezas de Material 3 Expressive; se crean en main(), cuando ya hay DOM.
+let ring: WavyRing;
+let centerShape: MorphingShape;
+let ringLoader: LoadingIndicator;
+let stageLoader: LoadingIndicator;
+let alertShape: MorphingShape;
+/** Último rótulo de estado pintado, para el rebote al cambiar. */
+let lastPhaseLabel = '';
+/** Si la alerta a pantalla completa estaba a la vista en el último pintado. */
+let alertShown = false;
 
 function config(): EngineConfig {
   return {
@@ -382,10 +409,20 @@ function drawOverlay(landmarks: Landmark[] | null): void {
 function render(): void {
   const deviation = engine.deviationDeg;
   ui.angle.textContent = formatDegrees(deviation);
-  ui.phase.textContent =
+  const phaseLabel =
     settings.controlMode && isAlerting(engine.phase)
       ? 'Mala postura registrada (sin avisar)'
       : PHASE_LABEL[engine.phase];
+  if (phaseLabel !== lastPhaseLabel) {
+    ui.phase.textContent = phaseLabel;
+    // Rebote del estado: se quita y se vuelve a poner la clase para relanzarlo.
+    if (lastPhaseLabel) {
+      ui.phase.classList.remove('pop');
+      void ui.phase.offsetWidth;
+      ui.phase.classList.add('pop');
+    }
+    lastPhaseLabel = phaseLabel;
+  }
   ui.cause.textContent = !settings.baseline
     ? 'Sin calibrar'
     : !visible
@@ -413,10 +450,10 @@ function render(): void {
   ui.gauge.style.color = color;
   document.documentElement.style.setProperty('--glow', color);
 
-  const fill = Math.min(1, Math.max(0, deviation / MAX_ANGLE));
-  ui.ringProgress.style.strokeDashoffset = String(RING_LENGTH * (1 - fill));
-  // Sin inclinación el extremo redondeado pintaría un punto suelto arriba.
-  ui.ringProgress.style.opacity = fill < 0.005 ? '0' : '1';
+  // El anillo ondulado y la forma del centro dicen cuánto urge enderezarse.
+  const { urgency, shape } = expressionFor(engine.phase, settings.controlMode);
+  ring.set(deviation / MAX_ANGLE, urgency);
+  centerShape.set(SHAPES[shape], urgency * 0.25);
   ui.ringMark.style.transform = `rotate(${Math.min(1, settings.thresholdDeg / MAX_ANGLE) * 360}deg)`;
 
   const graceRatio = engine.badMs / (settings.graceSeconds * 1000);
@@ -440,6 +477,14 @@ function render(): void {
   const showCountdown = engine.phase === 'countdown' && !settings.controlMode;
   const showAlarm = engine.phase === 'alarm' && !settings.controlMode;
   ui.alertOverlay.className = showAlarm ? 'alert alarm' : showCountdown ? 'alert countdown' : 'alert hidden';
+  if (showAlarm || showCountdown) {
+    alertShape.set(showAlarm ? SHAPES.burst12 : SHAPES.flower8, showAlarm ? 0.35 : 0.2);
+    alertShown = true;
+  } else if (alertShown) {
+    // Oculta, la forma deja de girar y de pedir fotogramas.
+    alertShape.set(SHAPES.flower8, 0);
+    alertShown = false;
+  }
   if (showCountdown) {
     ui.alertText.textContent = String(Math.max(1, engine.countsSpoken));
     ui.alertBody.textContent = '';
@@ -559,11 +604,38 @@ function downloadCsv(): void {
 
 // -------------------------------------------------------------- acciones ---
 
-async function ensureDetector(): Promise<boolean> {
-  if (landmarker) return true;
+/**
+ * Arranque en curso de cámara y detector. Empezar y calibrar a la vez (o la
+ * tecla C justo después de pulsar Empezar) antes abrían dos cámaras y dos
+ * detectores; ahora esperan al mismo arranque.
+ */
+let detectorStarting: Promise<boolean> | null = null;
+
+function ensureDetector(): Promise<boolean> {
+  if (landmarker) return Promise.resolve(true);
+  detectorStarting ??= startDetector().finally(() => {
+    detectorStarting = null;
+  });
+  return detectorStarting;
+}
+
+/** Mensaje del recuadro de la cámara mientras está apagada. */
+function setStage(title: string, text: string, loading: boolean): void {
+  ui.stageTitle.textContent = title;
+  ui.stageText.textContent = text;
+  ui.stageLens.hidden = loading;
+  // En SVG, `hidden` no es una propiedad: hay que tocar el atributo.
+  ui.stageLoader.toggleAttribute('hidden', !loading);
+  if (loading) stageLoader.start();
+  else stageLoader.stop();
+}
+
+async function startDetector(): Promise<boolean> {
   try {
+    setStage('Encendiendo la cámara…', 'Si el navegador lo pregunta, dale permiso para usarla.', true);
     setStatus('Pidiendo permiso de cámara…');
     await startCamera(ui.video);
+    setStage('Cargando el detector…', 'Es un modelo de unos megas que se guarda en este equipo.', true);
     setStatus('Cargando el detector de postura…');
     landmarker = await createPoseLandmarker(setStatus, settings.modelQuality);
     // La primera inferencia compila los kernels y puede tardar segundos: se
@@ -571,11 +643,18 @@ async function ensureDetector(): Promise<boolean> {
     setStatus('Preparando el detector…');
     await warmUp();
     restartLoop();
+    stageLoader.stop();
     ui.stageEmpty.hidden = true;
     setStatus('Cámara lista. El vídeo no sale de este equipo.');
     return true;
   } catch (error) {
-    setStatus(`No se pudo abrir la cámara: ${(error as Error).message}`);
+    const message = (error as Error).message;
+    setStage(
+      'No se pudo abrir la cámara',
+      `${message}. Revisa el permiso de cámara del navegador o si otra aplicación la está usando, y pulsa «Calibrar» otra vez.`,
+      false
+    );
+    setStatus(`No se pudo abrir la cámara: ${message}`);
     return false;
   }
 }
@@ -593,16 +672,39 @@ async function warmUp(): Promise<void> {
   }
 }
 
-/** Cambiar de modelo obliga a rehacer el detector. */
+/** Cuenta los cambios de modelo: solo el último se queda con el detector. */
+let rebuildGeneration = 0;
+
+/**
+ * Cambiar de modelo obliga a rehacer el detector. Antes un fallo al cargar
+ * el nuevo dejaba la app sin detector y en silencio, y un segundo cambio
+ * mientras cargaba el primero se ignoraba (el detector quedaba a `null`), así
+ * que se usaba un modelo distinto del elegido. Ahora el de antes sigue
+ * funcionando hasta que el nuevo está listo, y gana el último que se pidió.
+ */
 async function rebuildDetector(): Promise<void> {
   if (!landmarker) return;
-  const previo = landmarker;
-  landmarker = null;
-  previo.close();
+  const generation = ++rebuildGeneration;
+  const quality = settings.modelQuality;
   setStatus('Cambiando de modelo…');
-  landmarker = await createPoseLandmarker(setStatus, settings.modelQuality);
-  await warmUp();
-  setStatus(`Detector listo (precisión ${settings.modelQuality === 'full' ? 'alta' : 'ligera'}).`);
+  try {
+    const nuevo = await createPoseLandmarker(setStatus, quality);
+    if (generation !== rebuildGeneration) {
+      // Mientras cargaba, se pidió otro modelo: este ya no sirve.
+      nuevo.close();
+      return;
+    }
+    const previo = landmarker;
+    landmarker = nuevo;
+    previo?.close();
+    await warmUp();
+    setStatus(`Detector listo (precisión ${quality === 'full' ? 'alta' : 'ligera'}).`);
+  } catch (error) {
+    if (generation !== rebuildGeneration) return;
+    // El detector de antes sigue funcionando: se vuelve a su ajuste.
+    update({ modelQuality: quality === 'full' ? 'lite' : 'full' });
+    setStatus(`No se pudo cargar el otro modelo (${(error as Error).message}). Sigue el de antes.`);
+  }
 }
 
 /** `true` mientras se calibra: dos calibraciones a la vez se pisarían. */
@@ -617,15 +719,26 @@ async function calibrate(): Promise<void> {
     await runCalibration();
   } finally {
     calibrating = false;
+    showCalibrationLoader(false);
     ui.calibrate.disabled = false;
     ui.calibrate.textContent = 'Calibrar';
     ui.start.disabled = false;
   }
 }
 
+/** Mientras se calibra, el centro del anillo enseña el indicador de carga. */
+function showCalibrationLoader(on: boolean): void {
+  ui.ringLoader.toggleAttribute('hidden', !on);
+  ui.angle.hidden = on;
+  ui.angleCaption.textContent = on ? 'No te muevas…' : 'de inclinación';
+  if (on) ringLoader.start();
+  else ringLoader.stop();
+}
+
 async function runCalibration(): Promise<void> {
   if (!(await ensureDetector())) return;
   setStatus('Siéntate recto y no te muevas…');
+  showCalibrationLoader(true);
   calibrationSamples = [];
 
   // Se espera a juntar muestras, no un tiempo fijo: en un portátil lento cada
@@ -687,6 +800,7 @@ async function start(): Promise<void> {
   sessionStartedAt = Date.now();
   running = true;
   ui.start.textContent = 'Parar vigilancia';
+  ui.start.setAttribute('aria-pressed', 'true');
   ui.start.classList.add('stop');
   setStatus('Vigilando tu postura.');
   render();
@@ -701,6 +815,7 @@ function stop(): void {
   void alerts.releaseWakeLock();
   running = false;
   ui.start.textContent = 'Empezar a vigilar';
+  ui.start.setAttribute('aria-pressed', 'false');
   ui.start.classList.remove('stop');
   setStatus('En pausa.');
   render();
@@ -858,6 +973,20 @@ function bindLargeTitle(): void {
 }
 
 function main(): void {
+  installMotionTokens();
+  ring = new WavyRing(ui.ringWave, {
+    cx: RING.cx,
+    cy: RING.cy,
+    radius: RING_RADIUS,
+    maxAmplitude: RING.maxAmplitude,
+    wavelength: RING.wavelength,
+  });
+  centerShape = new MorphingShape(ui.ringShape, { cx: RING.cx, cy: RING.cy, radius: 78 });
+  ringLoader = new LoadingIndicator(ui.ringLoaderPath, { cx: 30, cy: 30, radius: 26 });
+  stageLoader = new LoadingIndicator(ui.stageLoaderPath, { cx: 32, cy: 32, radius: 28 });
+  // Radios con margen: al rebotar, el muelle estira la forma más allá de su tamaño.
+  alertShape = new MorphingShape(ui.alertShape, { cx: 170, cy: 170, radius: 150 }, SHAPES.flower8);
+
   const marca = document.getElementById('version');
   if (marca) marca.textContent = `v${__VERSION__}`;
 
@@ -869,7 +998,6 @@ function main(): void {
   bindInputs();
   bindShortcuts();
   bindLargeTitle();
-  ui.ringProgress.style.strokeDasharray = String(RING_LENGTH);
   render();
   renderHistory();
   renderNotice();

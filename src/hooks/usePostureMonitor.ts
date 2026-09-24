@@ -48,6 +48,13 @@ const SENSOR_INTERVAL_MS = 50;
 const MOTION_TOLERANCE_G = 0.22;
 /** Duración de la calibración con la espalda recta. */
 const CALIBRATION_MS = 1500;
+/**
+ * Cada cuánto se repinta la interfaz con lecturas nuevas. El sensor llega a
+ * 20 Hz, pero redibujar la pantalla entera a ese ritmo gasta batería sin que
+ * se note: la máquina de estados sigue recibiendo todas las lecturas y los
+ * cambios de fase se enseñan al instante.
+ */
+const UI_REFRESH_MS = 100;
 
 export type CalibrationState = 'none' | 'calibrating' | 'done';
 
@@ -116,11 +123,16 @@ export function usePostureMonitor(): PostureMonitor {
   const historyRef = useRef<SessionRecord[]>(history);
   /** Inicio de la sesión en curso, para guardarla al parar. */
   const sessionStartedAtRef = useRef(0);
+  /** Último repintado por lecturas del sensor, para limitarlos a 10 por segundo. */
+  const lastPaintAtRef = useRef(0);
   /** Evita dos calibraciones o dos pruebas a la vez (dos toques rápidos). */
   const calibratingRef = useRef(false);
   const previewingRef = useRef(false);
 
-  engineRef.current = engine;
+  // engineRef no se sincroniza aquí con `engine`: con el repintado limitado,
+  // el estado pintado puede ir una lectura por detrás del real, y copiarlo en
+  // cada render haría retroceder a la máquina. Quien cambia el estado escribe
+  // en los dos sitios.
   settingsRef.current = settings;
   headphonesRef.current = headphones;
   historyRef.current = history;
@@ -213,6 +225,16 @@ export function usePostureMonitor(): PostureMonitor {
     [pickAlarmSound, silence]
   );
 
+  /** Guarda el estado y lo pinta si toca (o siempre, si cambia la fase). */
+  const paint = useCallback((state: EngineState, force: boolean) => {
+    engineRef.current = state;
+    const now = Date.now();
+    if (force || now - lastPaintAtRef.current >= UI_REFRESH_MS) {
+      lastPaintAtRef.current = now;
+      setEngine(state);
+    }
+  }, []);
+
   /** Una lectura del acelerómetro: suavizar, medir ángulo y avanzar la máquina. */
   const handleSample = useCallback(
     (sample: Vector3) => {
@@ -253,8 +275,7 @@ export function usePostureMonitor(): PostureMonitor {
 
       // Sin vigilancia activa sólo refrescamos el ángulo para la interfaz.
       if (engineRef.current.phase === 'idle') {
-        engineRef.current = { ...engineRef.current, deviationDeg };
-        setEngine(engineRef.current);
+        paint({ ...engineRef.current, deviationDeg }, false);
         return;
       }
 
@@ -270,13 +291,12 @@ export function usePostureMonitor(): PostureMonitor {
         configRef.current
       );
 
-      engineRef.current = state;
-      setEngine(state);
+      paint(state, state.phase !== engineRef.current.phase);
       actions.forEach((action) => {
         void runAction(action);
       });
     },
-    [runAction]
+    [paint, runAction]
   );
 
   // El acelerómetro se escucha mientras la app está abierta: con la vigilancia

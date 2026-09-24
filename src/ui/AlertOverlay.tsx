@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet } from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native';
 
 import { MESSAGES, type Phase } from '../core/postureEngine';
-import { colors, roundedNumbers, spacing, type } from './theme';
+import { MorphShape } from './expressive';
+import { colors, roundedNumbers, spacing, type, withAlpha } from './theme';
 
 interface Props {
   phase: Phase;
@@ -29,6 +30,11 @@ export function AlertOverlay({ phase, countsSpoken, controlMode = false }: Props
   const flash = useRef(new Animated.Value(0)).current;
   const beat = useRef(new Animated.Value(0)).current;
   const visible = !controlMode && (phase === 'countdown' || phase === 'alarm');
+  // El titular cabe en una línea en cualquier móvil: el tamaño sale del ancho
+  // de la pantalla (unos 7,8 caracteres de ancho medio en «¡ENDERÉZATE!»), sin
+  // fiarse de adjustsFontSizeToFit, que no todas las plataformas respetan.
+  const { width } = useWindowDimensions();
+  const titleSize = Math.min(46, Math.floor((width - spacing.xxxl * 2) / 7.8));
 
   useEffect(() => {
     if (!visible) {
@@ -63,10 +69,17 @@ export function AlertOverlay({ phase, countsSpoken, controlMode = false }: Props
       style={[styles.overlay, { backgroundColor }]}
       accessibilityLiveRegion="assertive"
       accessibilityLabel={isAlarm ? `¡Enderézate! ${MESSAGES.notificationBody}` : `Cuenta atrás: ${Math.max(1, countsSpoken)}`}>
+      {/* Detrás del texto, la forma de estallido de Material 3 Expressive girando. */}
+      <Animated.View pointerEvents="none" style={[styles.shape, { transform: [{ scale }] }]}>
+        <MorphShape shape={isAlarm ? 'burst12' : 'flower8'} size={340} color={withAlpha(palette.text, 0.1)} spin={isAlarm ? 0.35 : 0.2} />
+      </Animated.View>
       {isAlarm ? (
         <>
           <Animated.Text
-            style={[styles.title, { color: palette.text, transform: [{ scale }] }]}
+            style={[
+              styles.title,
+              { color: palette.text, fontSize: titleSize, lineHeight: Math.round(titleSize * 1.15), transform: [{ scale }] },
+            ]}
             numberOfLines={1}
             adjustsFontSizeToFit>
             ¡ENDERÉZATE!
@@ -94,6 +107,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxxl,
     gap: spacing.lg,
   },
+  shape: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 46, lineHeight: 52, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
   subtitle: { ...type.title3, textAlign: 'center', maxWidth: 420 },
   count: { ...roundedNumbers, fontSize: 200, lineHeight: 220, fontWeight: '700' },

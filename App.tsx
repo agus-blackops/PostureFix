@@ -12,7 +12,8 @@ import { Notice } from './src/ui/Notice';
 import { PostureGauge } from './src/ui/PostureGauge';
 import { ResultsCard } from './src/ui/ResultsCard';
 import { SettingsSheet } from './src/ui/SettingsSheet';
-import { AmbientBackground, Button, Card, IconButton, StatusPill, setUiHaptics } from './src/ui/glass';
+import { Appear } from './src/ui/expressive';
+import { AmbientBackground, Button, ButtonGroup, Card, IconButton, StatusPill, setUiHaptics } from './src/ui/glass';
 import { colors, phaseColors, roundedNumbers, spacing, type } from './src/ui/theme';
 
 const STEPS = [
@@ -65,7 +66,7 @@ export default function App() {
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Título grande de iOS y el botón de ajustes en cristal. */}
-            <View style={styles.header}>
+            <Appear index={0} style={styles.header}>
               <View style={styles.headerText}>
                 <Text style={styles.brand} accessibilityRole="header">
                   PostureFix
@@ -73,9 +74,9 @@ export default function App() {
                 <Text style={styles.tagline}>Si te agachas demasiado, te enteras.</Text>
               </View>
               <IconButton glyph="⚙︎" onPress={() => setSettingsVisible(true)} accessibilityLabel="Abrir ajustes" />
-            </View>
+            </Appear>
 
-            <View style={styles.pills}>
+            <Appear index={1} style={styles.pills}>
               <StatusPill
                 label={running ? 'Vigilando' : 'En pausa'}
                 color={running ? colors.green : colors.neutral}
@@ -89,20 +90,22 @@ export default function App() {
               <StatusPill label={alarmSound === 'eas' ? 'Alarma EAS' : 'Sirena'} color={colors.tint} />
               {settings.controlMode ? <StatusPill label="Sesión de control" color={colors.yellow} emphasized /> : null}
               {sensorAvailable === false ? <StatusPill label="Sin acelerómetro" color={colors.red} emphasized /> : null}
-            </View>
+            </Appear>
 
             {calibrated ? null : (
-              <Card>
-                <Text style={styles.cardTitle}>Antes de empezar</Text>
-                {STEPS.map((step, index) => (
-                  <View key={step} style={styles.step}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepNumber}>{index + 1}</Text>
+              <Appear index={2}>
+                <Card>
+                  <Text style={styles.cardTitle}>Antes de empezar</Text>
+                  {STEPS.map((step, index) => (
+                    <View key={step} style={styles.step}>
+                      <View style={styles.stepBadge}>
+                        <Text style={styles.stepNumber}>{index + 1}</Text>
+                      </View>
+                      <Text style={styles.stepText}>{step}</Text>
                     </View>
-                    <Text style={styles.stepText}>{step}</Text>
-                  </View>
-                ))}
-              </Card>
+                  ))}
+                </Card>
+              </Appear>
             )}
 
             {sensorMoved ? (
@@ -137,58 +140,70 @@ export default function App() {
               />
             ) : null}
 
-            <Card style={styles.gaugeCard}>
-              <PostureGauge
-                deviationDeg={engine.deviationDeg}
-                thresholdDeg={settings.thresholdDeg}
-                phase={engine.phase}
-                graceProgress={graceProgress}
-                graceSeconds={settings.graceSeconds}
-                controlMode={settings.controlMode}
-              />
-            </Card>
+            <Appear index={3}>
+              <Card style={styles.gaugeCard}>
+                <PostureGauge
+                  deviationDeg={engine.deviationDeg}
+                  thresholdDeg={settings.thresholdDeg}
+                  phase={engine.phase}
+                  graceProgress={graceProgress}
+                  graceSeconds={settings.graceSeconds}
+                  controlMode={settings.controlMode}
+                  calibrating={calibrating}
+                />
+              </Card>
+            </Appear>
 
-            <Button
-              label={running ? 'Parar vigilancia' : calibrating ? 'Calibrando…' : 'Empezar a vigilar'}
-              onPress={() => (running ? monitor.stop() : void monitor.start())}
-              variant="prominent"
-              size="large"
-              color={running ? colors.red : colors.tint}
-              onColor={running ? colors.onStatus : colors.onTint}
-              disabled={calibrating || sensorAvailable === false}
-              haptic="medium"
-              accessibilityHint={running ? 'Guarda la sesión y deja de avisar' : 'Empieza a medir tu postura'}
-            />
-
-            <View style={styles.secondaryRow}>
+            <Appear index={4}>
               <Button
-                label={calibrating ? 'Calibrando…' : 'Calibrar'}
-                onPress={() => void monitor.calibrate()}
+                label={running ? 'Parar vigilancia' : calibrating ? 'Calibrando…' : 'Empezar a vigilar'}
+                onPress={() => (running ? monitor.stop() : void monitor.start())}
+                variant="prominent"
+                size="large"
+                color={running ? colors.red : colors.tint}
+                onColor={running ? colors.onStatus : colors.onTint}
                 disabled={calibrating || sensorAvailable === false}
-                stretch
-                accessibilityHint="Guarda tu postura actual como la buena"
+                selected={running}
+                haptic="medium"
+                accessibilityHint={running ? 'Guarda la sesión y deja de avisar' : 'Empieza a medir tu postura'}
               />
-              <Button
-                label={previewing ? 'Sonando…' : 'Probar alerta'}
-                onPress={() => void monitor.previewAlarm()}
-                disabled={previewing}
-                stretch
-                accessibilityHint="Reproduce la secuencia de aviso completa"
+            </Appear>
+
+            <Appear index={5}>
+              <ButtonGroup
+                items={[
+                  {
+                    label: calibrating ? 'Calibrando…' : 'Calibrar',
+                    onPress: () => void monitor.calibrate(),
+                    disabled: calibrating || sensorAvailable === false,
+                    accessibilityHint: 'Guarda tu postura actual como la buena',
+                  },
+                  {
+                    label: previewing ? 'Sonando…' : 'Probar alerta',
+                    onPress: () => void monitor.previewAlarm(),
+                    disabled: previewing,
+                    accessibilityHint: 'Reproduce la secuencia de aviso completa',
+                  },
+                ]}
               />
-            </View>
+            </Appear>
 
-            <Card style={styles.stats}>
-              {stats.map((stat, index) => (
-                <View key={stat.label} style={[styles.stat, index > 0 && styles.statDivider]}>
-                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-                    {stat.value}
-                  </Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              ))}
-            </Card>
+            <Appear index={6}>
+              <Card style={styles.stats}>
+                {stats.map((stat, index) => (
+                  <View key={stat.label} style={[styles.stat, index > 0 && styles.statDivider]}>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                      {stat.value}
+                    </Text>
+                    <Text style={styles.statLabel}>{stat.label}</Text>
+                  </View>
+                ))}
+              </Card>
+            </Appear>
 
-            <ResultsCard history={history} />
+            <Appear index={7}>
+              <ResultsCard history={history} />
+            </Appear>
 
             <Text style={styles.footer}>
               PostureFix {Constants.expoConfig?.version ?? ''} · La vigilancia necesita la app en primer plano: el sistema
@@ -236,7 +251,6 @@ const styles = StyleSheet.create({
   stepNumber: { ...type.footnote, ...roundedNumbers, fontWeight: '700', color: colors.onTint },
   stepText: { ...type.subheadline, color: colors.secondaryLabel, flex: 1 },
   gaugeCard: { paddingVertical: spacing.xxl },
-  secondaryRow: { flexDirection: 'row', gap: spacing.md },
   stats: { flexDirection: 'row', paddingVertical: spacing.lg, paddingHorizontal: 0, gap: 0 },
   stat: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.sm },
   statDivider: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.separator },
