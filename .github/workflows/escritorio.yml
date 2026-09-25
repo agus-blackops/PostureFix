@@ -1,0 +1,122 @@
+# Construye el ejecutable de escritorio (webcam) en los runners de GitHub.
+# Los archivos quedan como artefactos descargables de cada ejecución.
+name: App de escritorio
+
+on:
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: >-
+          Etiqueta ya existente a la que subir los ejecutables (p. ej. v1.0.1).
+          Vacío: solo construir.
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'web/**'
+      - 'src/core/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/escritorio.yml'
+  push:
+    branches: [main]
+    tags: ['v*', 'V*']
+
+jobs:
+  build:
+    name: ${{ matrix.nombre }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            nombre: windows
+            artefactos: |
+              release/*.exe
+          - os: ubuntu-latest
+            nombre: linux
+            artefactos: |
+              release/*.AppImage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobaciones
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Empaquetar
+        run: npm run desktop:build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: posturefix-${{ matrix.nombre }}
+          path: ${{ matrix.artefactos }}
+          if-no-files-found: error
+
+  publicar:
+    # Al etiquetar una versión (v1.0.1, v1.1.0…) los ejecutables se cuelgan de
+    # un Release, que a diferencia de los artefactos no caduca ni pide sesión.
+    name: Publicar la versión
+    needs: build
+    # Al etiquetar, o a mano cuando la etiqueta ya existe y hay que colgarle
+    # los ejecutables (por ejemplo si el Release se creó desde la web).
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      startsWith(github.ref, 'refs/tags/V') ||
+      github.event.inputs.etiqueta != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefactos
+
+      - name: Sacar las notas del CHANGELOG
+        env:
+          ETIQUETA: ${{ github.event.inputs.etiqueta || github.ref_name }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const version = process.env.ETIQUETA.replace(/^v/i, '');
+            const seccion = fs.readFileSync('CHANGELOG.md', 'utf8')
+              .split(/^## /m)
+              .find((bloque) => bloque.trimStart().startsWith(version));
+            fs.writeFileSync('notas.md', seccion ? '## ' + seccion.trim() : 'Sin notas para ' + version + '.');
+          "
+          cat notas.md
+
+      - name: Publicar el Release con los ejecutables
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETIQUETA: ${{ github.event.inputs.etiqueta || github.ref_name }}
+        # La etiqueta puede llegar de dos formas: empujada con git (aquí no
+        # existe todavía ningún Release) o creada desde el formulario de
+        # GitHub (que ya lo ha creado). Se cubren las dos.
+        run: |
+          ARCHIVOS=(artefactos/posturefix-windows/*.exe artefactos/posturefix-linux/*.AppImage)
+          if gh release view "$ETIQUETA" >/dev/null 2>&1; then
+            gh release edit "$ETIQUETA" --title "PostureFix $ETIQUETA" --notes-file notas.md
+            gh release upload "$ETIQUETA" "${ARCHIVOS[@]}" --clobber
+          else
+            gh release create "$ETIQUETA" \
+              --title "PostureFix $ETIQUETA" \
+              --notes-file notas.md \
+              "${ARCHIVOS[@]}"
+          fi
