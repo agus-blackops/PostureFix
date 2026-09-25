@@ -44,4 +44,24 @@ describe('sanitize (ajustes del móvil)', () => {
       Object.keys(DEFAULT_SETTINGS).sort()
     );
   });
+
+  it('solo acepta niveles de aviso conocidos', () => {
+    expect(sanitize({ maxAlertLevel: 'count' }).maxAlertLevel).toBe('count');
+    expect(sanitize({ maxAlertLevel: 'sirena' }).maxAlertLevel).toBe(DEFAULT_SETTINGS.maxAlertLevel);
+  });
+
+  it('los ajustes guardados por la 1.1.2 toman los nuevos por defecto', () => {
+    const { maxAlertLevel, uiHaptics, dailyGoalMinutes, labsStreaks, labsWeekly, labsStretches, ...old } = {
+      ...DEFAULT_SETTINGS,
+      thresholdDeg: 25,
+    };
+    const result = sanitize(old);
+    expect(result.thresholdDeg).toBe(25);
+    expect(result).toMatchObject({ maxAlertLevel, uiHaptics, dailyGoalMinutes, labsStreaks, labsWeekly, labsStretches });
+  });
+
+  it('recorta el objetivo diario a su rango', () => {
+    expect(sanitize({ dailyGoalMinutes: 1 }).dailyGoalMinutes).toBe(LIMITS.dailyGoalMinutes.min);
+    expect(sanitize({ dailyGoalMinutes: 9999 }).dailyGoalMinutes).toBe(LIMITS.dailyGoalMinutes.max);
+  });
 });

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { formatPercent } from '../core/format';
 import { compareModes, type SessionRecord } from '../core/sessionLog';
 import { Card, ProgressBar } from './glass';
+import { SectionTitle } from './things';
 import { colors, roundedNumbers, spacing, type } from './theme';
 
 interface Props {
@@ -27,9 +28,7 @@ export function ResultsCard({ history }: Props) {
 
   return (
     <Card>
-      <Text style={styles.title} accessibilityRole="header">
-        Resultados
-      </Text>
+      <SectionTitle icon="check" color={colors.green} title="Resultados" />
       <Text style={styles.subtitle}>Tiempo que pasas encorvado</Text>
 
       {rows.map(({ label, summary, color }) => (
@@ -57,8 +56,7 @@ export function ResultsCard({ history }: Props) {
 }
 
 const styles = StyleSheet.create({
-  title: { ...type.title3, color: colors.label },
-  subtitle: { ...type.subheadline, color: colors.secondaryLabel, marginTop: -spacing.sm },
+  subtitle: { ...type.subheadline, color: colors.secondaryLabel, marginTop: -spacing.xs },
   row: { gap: spacing.sm },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   label: { ...type.subheadline, color: colors.label },

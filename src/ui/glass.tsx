@@ -56,6 +56,9 @@ function feedback(kind: UiFeedback): void {
   uiFeedback(kind, hapticsEnabled);
 }
 
+/** El mismo toque suave que dan los botones, para controles hechos fuera de aquí. */
+export const uiTap = feedback;
+
 const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
 // ------------------------------------------------------------- superficie ---
@@ -135,18 +138,19 @@ const NEUTRAL_GLOW = colors.neutral;
 const GLOW_COLORS = [NEUTRAL_GLOW, colors.green, colors.yellow, colors.tint, colors.red] as const;
 
 const glowImage = (color: string) =>
-  `radial-gradient(circle at 90% 100%, ${withAlpha(color, 0.34)} 0%, ${withAlpha(color, 0)} 62%)`;
-const BASE_GLOW = `radial-gradient(circle at 0% 0%, ${withAlpha(colors.tint, 0.26)} 0%, ${withAlpha(
+  `radial-gradient(circle at 90% 100%, ${withAlpha(color, 0.24)} 0%, ${withAlpha(color, 0)} 60%)`;
+const BASE_GLOW = `radial-gradient(circle at 0% 0%, ${withAlpha(colors.tint, 0.17)} 0%, ${withAlpha(
   colors.tint,
   0
-)} 58%)`;
+)} 55%)`;
 
 /** El degradado va por la propiedad nativa en iOS/Android y por CSS en la web. */
 const gradientStyle = (image: string): ViewStyle =>
   (Platform.OS === 'web' ? { backgroundImage: image } : { experimental_backgroundImage: image }) as ViewStyle;
 
 /**
- * Fondo de la app: negro cálido con dos resplandores. El de arriba es siempre
+ * Fondo de la app: negro cálido con dos resplandores, más tenues desde la
+ * 1.1.3 para que mande el contenido, como en Things. El de arriba es siempre
  * el naranja de la marca; el de abajo toma el color del estado de la postura y
  * cambia con un fundido, así el cristal de encima se tiñe solo.
  */
@@ -399,10 +403,13 @@ function GroupButton({ item, first, last }: { item: GroupItem; first: boolean; l
 /** Botón redondo de cristal de 44 pt, la zona táctil mínima de Apple. */
 export function IconButton({
   glyph,
+  icon,
   onPress,
   accessibilityLabel,
 }: {
-  glyph: string;
+  glyph?: string;
+  /** Icono dibujado; si está, sustituye al glifo de texto. */
+  icon?: ReactNode;
   onPress: () => void;
   accessibilityLabel: string;
 }) {
@@ -420,7 +427,8 @@ export function IconButton({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}>
         <GlassSurface material="thin" cornerRadius={radius.capsule} interactive style={styles.iconButton}>
-          <Text style={styles.iconGlyph}>{glyph}</Text>
+          {/* En la web el SVG suelto quedaría debajo del desenfoque, que va posicionado. */}
+          {icon ? <View>{icon}</View> : <Text style={styles.iconGlyph}>{glyph}</Text>}
         </GlassSurface>
       </Pressable>
     </Animated.View>

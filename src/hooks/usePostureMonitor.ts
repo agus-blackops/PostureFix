@@ -142,8 +142,9 @@ export function usePostureMonitor(): PostureMonitor {
       ...DEFAULT_ENGINE_CONFIG,
       thresholdDeg: settings.thresholdDeg,
       graceMs: settings.graceSeconds * 1000,
+      maxLevel: settings.maxAlertLevel,
     }),
-    [settings.thresholdDeg, settings.graceSeconds]
+    [settings.thresholdDeg, settings.graceSeconds, settings.maxAlertLevel]
   );
   const configRef = useRef(config);
   configRef.current = config;
@@ -446,7 +447,7 @@ export function usePostureMonitor(): PostureMonitor {
     recordSession();
   }, [recordSession, runAction, silence]);
 
-  /** Prueba la secuencia completa sin tener que agacharse. */
+  /** Prueba la secuencia sin tener que agacharse, hasta el nivel de aviso elegido. */
   const previewAlarm = useCallback(async () => {
     if (previewingRef.current) return;
     previewingRef.current = true;
@@ -457,11 +458,16 @@ export function usePostureMonitor(): PostureMonitor {
       await audio?.prepare();
       await audio?.playBeep(current.volume);
       await fireHaptic('warning', current.vibrationEnabled);
+      if (current.maxAlertLevel === 'beep') {
+        await new Promise((resolve) => setTimeout(resolve, DEFAULT_ENGINE_CONFIG.scareMs));
+        return;
+      }
       for (let i = 0; i < MESSAGES.counts.length; i++) {
         await new Promise((resolve) => setTimeout(resolve, DEFAULT_ENGINE_CONFIG.countStepMs));
         speak(MESSAGES.counts[i], current.voiceEnabled);
       }
       await new Promise((resolve) => setTimeout(resolve, DEFAULT_ENGINE_CONFIG.countStepMs));
+      if (current.maxAlertLevel === 'count') return;
       speak(MESSAGES.alarm, current.voiceEnabled);
       await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), current.volume);
       await fireHaptic('alarm', current.vibrationEnabled);

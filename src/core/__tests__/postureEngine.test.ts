@@ -142,4 +142,34 @@ describe('postureEngine', () => {
     expect(second.state.phase).toBe('alarm');
     expect(second.state.totalAlerts).toBe(2);
   });
+
+  it('con «solo pitido» no cuenta ni hace sonar la alarma', () => {
+    const config: EngineConfig = { ...CONFIG, maxLevel: 'beep' };
+    const run = advance(monitoring(), 40, CONFIG.graceMs + CONFIG.scareMs + 3 * CONFIG.countStepMs + TICK_MS, { config });
+    expect(types(run.actions)).toContain('beep');
+    expect(types(run.actions)).not.toContain('startAlarm');
+    expect(spoken(run.actions)).toEqual([]);
+    expect(run.state.phase).toBe('cooldown');
+    expect(run.state.totalAlerts).toBe(1);
+  });
+
+  it('con «solo pitido» vuelve a pitar tras el descanso si sigue agachado', () => {
+    const config: EngineConfig = { ...CONFIG, maxLevel: 'beep' };
+    const cycle = CONFIG.graceMs + CONFIG.scareMs + CONFIG.cooldownMs + 4 * TICK_MS;
+    const run = advance(monitoring(), 40, 2 * cycle, { config });
+    expect(types(run.actions).filter((type) => type === 'beep')).toHaveLength(2);
+    expect(run.state.totalAlerts).toBe(2);
+  });
+
+  it('con «pitido y cuenta» cuenta hasta tres y descansa sin alarma', () => {
+    const config: EngineConfig = { ...CONFIG, maxLevel: 'count' };
+    const run = advance(monitoring(), 40, CONFIG.graceMs + CONFIG.scareMs + 3 * CONFIG.countStepMs + 2 * TICK_MS, {
+      config,
+    });
+    expect(spoken(run.actions)).toEqual(MESSAGES.counts);
+    expect(types(run.actions)).not.toContain('startAlarm');
+    expect(types(run.actions)).not.toContain('notify');
+    expect(run.state.phase).toBe('cooldown');
+    expect(run.state.totalAlerts).toBe(1);
+  });
 });

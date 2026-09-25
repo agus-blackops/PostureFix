@@ -23,6 +23,14 @@ export type Phase =
 
 export type AlarmSound = 'eas' | 'siren';
 
+/**
+ * Hasta dónde sube el aviso: solo el pitido, pitido y cuenta, o la secuencia
+ * entera con la alarma. En clase o en una biblioteca, la alarma sobra.
+ */
+export type AlertLevel = 'beep' | 'count' | 'alarm';
+
+export const ALERT_LEVELS: readonly AlertLevel[] = ['beep', 'count', 'alarm'];
+
 export type EngineAction =
   | { type: 'beep' }
   | { type: 'speak'; text: string }
@@ -48,6 +56,8 @@ export interface EngineConfig {
   cooldownMs: number;
   /** Corte de seguridad: la alarma nunca suena más de este tiempo seguido. */
   maxAlarmMs: number;
+  /** Último escalón del aviso; al llegar a él cuenta como alerta y se descansa. */
+  maxLevel: AlertLevel;
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -59,6 +69,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   recoverMs: 800,
   cooldownMs: 4000,
   maxAlarmMs: 45000,
+  maxLevel: 'alarm',
 };
 
 export const MESSAGES = {
@@ -193,6 +204,11 @@ export function step(state: EngineState, input: EngineInput, config: EngineConfi
       if (recovered) {
         toPhase('ok');
         actions.push({ type: 'silence' }, { type: 'speak', text: MESSAGES.recovered });
+      } else if (next.phaseMs >= config.scareMs && config.maxLevel === 'beep') {
+        // Solo pitido: el aviso acaba aquí y, si sigue agachado, vuelve a pitar
+        // tras el descanso.
+        toPhase('cooldown');
+        next.totalAlerts = state.totalAlerts + 1;
       } else if (next.phaseMs >= config.scareMs) {
         // Paso 3: empieza la cuenta atrás hablada.
         toPhase('countdown');
@@ -210,7 +226,16 @@ export function step(state: EngineState, input: EngineInput, config: EngineConfi
         break;
       }
       const spoken = state.countsSpoken;
-      if (spoken >= MESSAGES.counts.length && next.phaseMs >= MESSAGES.counts.length * config.countStepMs) {
+      if (
+        spoken >= MESSAGES.counts.length &&
+        next.phaseMs >= MESSAGES.counts.length * config.countStepMs &&
+        config.maxLevel === 'count'
+      ) {
+        // Sin alarma: la cuenta es el último aviso.
+        toPhase('cooldown');
+        next.countsSpoken = 0;
+        next.totalAlerts = state.totalAlerts + 1;
+      } else if (spoken >= MESSAGES.counts.length && next.phaseMs >= MESSAGES.counts.length * config.countStepMs) {
         // Paso 4: alerta fuerte.
         toPhase('alarm');
         next.countsSpoken = 0;

@@ -2,6 +2,7 @@ import { sanitizeHistory, type SessionRecord } from '../../src/core/sessionLog';
 import type { ModelQuality } from './detector';
 import type { PostureMetrics } from './postureVision';
 import { readBoolean, readChoice, readNumber } from '../../src/core/validate';
+import { ALERT_LEVELS, type AlertLevel } from '../../src/core/postureEngine';
 
 const STORAGE_KEY = 'posturefix.web.v1';
 const HISTORY_KEY = 'posturefix.web.history.v1';
@@ -27,6 +28,8 @@ export interface WebSettings {
   controlMode: boolean;
   /** Modelo de detección: 'full' sitúa mejor los puntos, 'lite' pide menos CPU. */
   modelQuality: ModelQuality;
+  /** Último escalón del aviso: pitido, cuenta o alarma completa. */
+  maxAlertLevel: AlertLevel;
 }
 
 export const DEFAULT_SETTINGS: WebSettings = {
@@ -41,6 +44,7 @@ export const DEFAULT_SETTINGS: WebSettings = {
   fps: 15,
   controlMode: false,
   modelQuality: 'full',
+  maxAlertLevel: 'alarm',
 };
 
 export const LIMITS = {
@@ -78,6 +82,7 @@ export function sanitize(raw: Partial<Record<keyof WebSettings, unknown>> | null
     notificationsEnabled: flag('notificationsEnabled'),
     controlMode: flag('controlMode'),
     modelQuality: readChoice(input.modelQuality, ['full', 'lite'] as const, DEFAULT_SETTINGS.modelQuality),
+    maxAlertLevel: readChoice(input.maxAlertLevel, ALERT_LEVELS, DEFAULT_SETTINGS.maxAlertLevel),
   };
 }
 

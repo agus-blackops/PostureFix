@@ -9,6 +9,7 @@ import {
   step,
   stopMonitoring,
   type AlarmSound,
+  type AlertLevel,
   type EngineAction,
   type EngineConfig,
   type EngineState,
@@ -177,7 +178,9 @@ const ui = {
     notificationsEnabled: el<HTMLInputElement>('set-notify'),
     modelFull: el<HTMLInputElement>('modelo-full'),
     modelLite: el<HTMLInputElement>('modelo-lite'),
+    levels: [el<HTMLInputElement>('nivel-beep'), el<HTMLInputElement>('nivel-count'), el<HTMLInputElement>('nivel-alarm')],
   },
+  levelNote: el('nivel-nota'),
   fairMode: el<HTMLInputElement>('set-feria'),
   values: {
     thresholdDeg: el('val-threshold'),
@@ -230,8 +233,15 @@ function config(): EngineConfig {
     ...DEFAULT_ENGINE_CONFIG,
     thresholdDeg: settings.thresholdDeg,
     graceMs: settings.graceSeconds * 1000,
+    maxLevel: settings.maxAlertLevel,
   };
 }
+
+const LEVEL_NOTES: Record<AlertLevel, string> = {
+  beep: 'Solo el pitido, y vuelve a pitar si sigues encorvado. Para clase o la biblioteca.',
+  count: 'Pitido y la cuenta «uno, dos, tres», pero sin sirena ni notificación.',
+  alarm: 'La secuencia entera: pitido, cuenta y alarma hasta que te enderezas.',
+};
 
 function alarmSound(): AlarmSound {
   return settings.easAlways || settings.headphones ? 'eas' : 'siren';
@@ -821,7 +831,7 @@ function stop(): void {
   render();
 }
 
-/** Reproduce la secuencia entera sin tener que encorvarse. */
+/** Reproduce la secuencia, hasta el nivel de aviso elegido, sin tener que encorvarse. */
 async function preview(): Promise<void> {
   if (ui.test.disabled) return;
   await alerts.unlock();
@@ -830,14 +840,20 @@ async function preview(): Promise<void> {
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   alerts.playBeep();
-  for (const number of MESSAGES.counts) {
+  if (settings.maxAlertLevel === 'beep') {
+    await wait(DEFAULT_ENGINE_CONFIG.scareMs);
+  } else {
+    for (const number of MESSAGES.counts) {
+      await wait(DEFAULT_ENGINE_CONFIG.countStepMs);
+      alerts.speak(number, settings.voiceEnabled);
+    }
     await wait(DEFAULT_ENGINE_CONFIG.countStepMs);
-    alerts.speak(number, settings.voiceEnabled);
+    if (settings.maxAlertLevel === 'alarm') {
+      alerts.speak(MESSAGES.alarm, settings.voiceEnabled);
+      alerts.startAlarm(alarmSound());
+      await wait(3500);
+    }
   }
-  await wait(DEFAULT_ENGINE_CONFIG.countStepMs);
-  alerts.speak(MESSAGES.alarm, settings.voiceEnabled);
-  alerts.startAlarm(alarmSound());
-  await wait(3500);
   alerts.stopAll();
   ui.test.disabled = false;
   ui.test.textContent = 'Probar alerta';
@@ -865,6 +881,8 @@ function syncInputs(): void {
   ui.inputs.controlMode.checked = settings.controlMode;
   ui.inputs.modelFull.checked = settings.modelQuality === 'full';
   ui.inputs.modelLite.checked = settings.modelQuality === 'lite';
+  for (const radio of ui.inputs.levels) radio.checked = radio.value === settings.maxAlertLevel;
+  ui.levelNote.textContent = LEVEL_NOTES[settings.maxAlertLevel];
   ui.fairMode.checked = fairModeOn;
 
   // Tramo recorrido de cada deslizador, pintado en el acento como en iOS.
@@ -909,6 +927,11 @@ function bindInputs(): void {
       if (!radio.checked) return;
       update({ modelQuality: radio.value === 'lite' ? 'lite' : 'full' });
       void rebuildDetector();
+    });
+  }
+  for (const radio of ui.inputs.levels) {
+    radio.addEventListener('change', () => {
+      if (radio.checked) update({ maxAlertLevel: radio.value as AlertLevel });
     });
   }
   ui.fairMode.addEventListener('change', toggleFairMode);

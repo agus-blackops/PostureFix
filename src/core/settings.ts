@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { DEFAULT_ENGINE_CONFIG } from './postureEngine';
+import { ALERT_LEVELS, DEFAULT_ENGINE_CONFIG, type AlertLevel } from './postureEngine';
 import { sanitizeHistory, type SessionRecord } from './sessionLog';
 import type { Vector3 } from './orientation';
-import { clamp, readBoolean, readNumber } from './validate';
+import { clamp, readBoolean, readChoice, readNumber } from './validate';
 
 const STORAGE_KEY = 'posturefix.settings.v1';
 const HISTORY_KEY = 'posturefix.history.v1';
@@ -34,6 +34,20 @@ export interface Settings {
    * comparar para saber si los avisos sirven de algo.
    */
   controlMode: boolean;
+  /** Último escalón del aviso: pitido, cuenta o alarma completa. */
+  maxAlertLevel: AlertLevel;
+  /** Toques suaves al pulsar botones e interruptores. */
+  uiHaptics: boolean;
+
+  // PostureFix Labs (solo con la suscripción activa).
+  /** Minutos de buena postura al día que cuentan para la racha. */
+  dailyGoalMinutes: number;
+  /** Tarjeta de objetivo diario, racha e insignias. */
+  labsStreaks: boolean;
+  /** Informe de los últimos siete días. */
+  labsWeekly: boolean;
+  /** Estiramientos guiados con temporizador y voz. */
+  labsStretches: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -49,12 +63,19 @@ export const DEFAULT_SETTINGS: Settings = {
   keepAwake: true,
   manualHeadphones: false,
   controlMode: false,
+  maxAlertLevel: DEFAULT_ENGINE_CONFIG.maxLevel,
+  uiHaptics: true,
+  dailyGoalMinutes: 30,
+  labsStreaks: true,
+  labsWeekly: true,
+  labsStretches: true,
 };
 
 export const LIMITS = {
   thresholdDeg: { min: 10, max: 55, step: 1 },
   graceSeconds: { min: 1, max: 20, step: 0.5 },
   volume: { min: 0.2, max: 1, step: 0.05 },
+  dailyGoalMinutes: { min: 10, max: 240, step: 5 },
 };
 
 export { clamp };
@@ -84,6 +105,17 @@ export function sanitize(raw: Partial<Record<keyof Settings, unknown>> | null | 
     keepAwake: flag('keepAwake'),
     manualHeadphones: flag('manualHeadphones'),
     controlMode: flag('controlMode'),
+    maxAlertLevel: readChoice(input.maxAlertLevel, ALERT_LEVELS, DEFAULT_SETTINGS.maxAlertLevel),
+    uiHaptics: flag('uiHaptics'),
+    dailyGoalMinutes: readNumber(
+      input.dailyGoalMinutes,
+      DEFAULT_SETTINGS.dailyGoalMinutes,
+      LIMITS.dailyGoalMinutes.min,
+      LIMITS.dailyGoalMinutes.max
+    ),
+    labsStreaks: flag('labsStreaks'),
+    labsWeekly: flag('labsWeekly'),
+    labsStretches: flag('labsStretches'),
   };
 }
 

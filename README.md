@@ -139,9 +139,9 @@ sección *Artifacts* (caducan a los 90 días y piden sesión):
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-portable-1.1.2.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-1.1.2.exe` | Windows con instalador y acceso directo |
-| `PostureFix-1.1.2.AppImage` | Linux |
+| `PostureFix-portable-1.1.3.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-1.1.3.exe` | Windows con instalador y acceso directo |
+| `PostureFix-1.1.3.AppImage` | Linux |
 
 ### Construirla uno mismo
 
@@ -206,10 +206,50 @@ Desde el engranaje de la pantalla principal:
 - **Volumen** de las alertas.
 - **Tono EAS con auriculares** y **tono EAS siempre** (también por altavoz).
 - **Voz**, **vibración**, **notificación** y **mantener la pantalla encendida**.
+- **Hasta dónde avisa**: solo el pitido, pitido y cuenta, o la secuencia entera con la
+  alarma. En clase o en una biblioteca, la alarma sobra.
+- **Toques al pulsar**: la vibración suave de botones e interruptores, aparte de la de las
+  alertas.
 - En la versión de portátil, **precisión del detector** (modelo grande o ligero) y
   **modo feria**, que deja los tiempos cortos para enseñarlo en un stand.
 
-El botón **Probar alerta** reproduce la secuencia completa sin tener que agacharse.
+El botón **Probar alerta** reproduce la secuencia hasta el nivel elegido sin tener que
+agacharse.
+
+## PostureFix Labs
+
+Experimentos de la app de móvil que se abren con una suscripción barata (0,99 € al mes o
+7,99 € al año). Vigilar la postura y todas las alertas siguen siendo gratis.
+
+- **Objetivo diario y rachas**: minutos de buena postura al día, días seguidos
+  cumpliéndolo e insignias.
+- **Informe semanal**: los últimos siete días en un gráfico, con el tiempo encorvado, las
+  alertas, el mejor día y la comparación con la semana anterior.
+- **Estiramientos guiados**: tres rutinas de unos dos minutos (cuello, hombros y espalda)
+  con temporizador y voz.
+
+Todo sale del historial de sesiones que ya se guardaba para el experimento
+(`src/core/progress.ts` y `src/core/stretches.ts`, puros y con tests).
+
+### Cobrar la suscripción
+
+Las compras van por [RevenueCat](https://www.revenuecat.com), que habla con la App Store y con
+Google Play. Para que funcionen hace falta, una sola vez:
+
+1. Cuentas de desarrollador de Apple y de Google Play, dadas de alta por un adulto.
+2. Dos suscripciones en cada tienda, con los identificadores `posturefix_labs_monthly`
+   (0,99 €/mes) y `posturefix_labs_annual` (7,99 €/año).
+3. En RevenueCat: el proyecto con las dos apps, un *entitlement* llamado `labs` con los dos
+   productos y una *offering* por defecto con los paquetes mensual y anual.
+4. Las claves públicas del SDK en `.env.local` (plantilla en `.env.example`):
+   `EXPO_PUBLIC_REVENUECAT_IOS_KEY` y `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+5. Una build de desarrollo o de tienda (`npx expo run:ios` / `run:android` o EAS): en Expo Go
+   no hay módulo nativo de compras.
+
+Sin claves, o en la web, Labs sale como «no disponible» y la app funciona igual. En una build
+de desarrollo sin tienda aparece un botón para probar Labs sin pagar; en producción no existe.
+Antes de publicar en la App Store, Apple pide que la pantalla de suscripción enlace a unas
+condiciones de uso y a una política de privacidad.
 
 ## Recursos generados
 
@@ -224,7 +264,7 @@ sonidos y los iconos que se versionan en `assets/`:
 
 ## Versiones
 
-`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.1.2**, la
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.1.3**, la
 que va a la feria.
 
 ## Panel para la feria
@@ -252,6 +292,16 @@ src/core/shapes.ts           geometría de la onda y de las formas que se transf
 src/core/expression.ts       urgencia y forma de cada fase, igual en móvil y portátil
 src/core/format.ts           formatos compartidos: duraciones, porcentajes y grados
 src/core/validate.ts         lectura defensiva de los ajustes guardados
+src/core/progress.ts         Labs: objetivo diario, rachas, insignias e informe semanal (con tests)
+src/core/stretches.ts        Labs: rutinas de estiramientos y su reloj (con tests)
+src/core/labs.ts             Labs: productos, precios de reserva y experimentos
+src/services/purchases.ts    suscripción de Labs con RevenueCat
+src/hooks/useLabs.ts         estado de la suscripción para la interfaz
+src/ui/things.tsx            piezas al estilo de Things: casilla, quesito, iconos, segmentado
+src/ui/Sheet.tsx             hoja de cristal con muelle que se cierra arrastrando
+src/ui/LabsSheet.tsx         pantalla de Labs y de la suscripción
+src/ui/LabsCards.tsx         tarjetas de «Hoy» y «Tu semana»
+src/ui/StretchSheet.tsx      estiramientos guiados
 src/ui/                      el resto de la interfaz
 modules/headphones/          módulo nativo de detección de auriculares (Kotlin + Swift)
 scripts/generate-assets.mjs  generador de sonidos e iconos
@@ -265,7 +315,7 @@ docs/panel-feria.html        panel explicativo para el stand
 ```
 
 La lógica de la secuencia vive en una función pura (`step()`), compartida por las dos
-versiones, así que las 70 pruebas la recorren entera —pitido, cuenta atrás, alarma,
+versiones, así que las pruebas la recorren entera —pitido, cuenta atrás, alarma,
 recuperación, histéresis y cortes de seguridad— sin sensores, cámara ni sonido.
 
 ## Limitaciones

@@ -1,5 +1,69 @@
 # Cambios
 
+## 1.1.3
+
+Un aire a Things sobre el cristal y Expressive de la 1.1.2, ajustes nuevos,
+PostureFix Labs con su suscripción y animaciones más pulidas. Se mide y se
+avisa igual que antes.
+
+**Estilo Things**
+
+- Más aire entre tarjetas y un fondo más tranquilo: los dos resplandores bajan
+  de intensidad para que mande el contenido, en el móvil y en el portátil.
+- Títulos de sección con su icono de color, como los proyectos de Things.
+- Casillas que se marcan con un pequeño golpe y una marca que se dibuja de
+  izquierda a derecha, y el «quesito» de progreso de los proyectos para el
+  objetivo del día y el paso de cada estiramiento.
+- Iconos dibujados en vez de símbolos de texto, para que se vean igual en
+  cualquier móvil.
+
+**Ajustes nuevos**
+
+- **Hasta dónde avisa**: solo el pitido, pitido y cuenta, o la secuencia entera.
+  Con «solo pitido» vuelve a pitar tras el descanso si sigues agachado; en los
+  tres casos el último aviso cuenta como alerta. «Probar alerta» respeta el
+  nivel elegido. Está también en la versión de portátil.
+- **Toques al pulsar**: la vibración suave de la interfaz tiene interruptor
+  propio y ya no depende de la vibración de las alertas.
+- **PostureFix Labs** tiene su fila arriba de los ajustes.
+
+**PostureFix Labs**
+
+- **Objetivo diario y rachas**: minutos de buena postura al día (30 por defecto,
+  de 10 a 240), días seguidos cumpliéndolo, la mejor racha y seis insignias. La
+  racha no se rompe hasta medianoche.
+- **Informe semanal**: los últimos siete días en barras de buena y mala postura,
+  con el porcentaje encorvado, los minutos rectos, las alertas, el mejor día y
+  la comparación con la semana anterior.
+- **Estiramientos guiados**: tres rutinas de unos dos minutos (cuello, hombros y
+  espalda) con temporizador, voz, pausa y saltos entre pasos. La pantalla se
+  queda encendida mientras dura.
+- Cada experimento se enciende o se apaga con su casilla.
+- **Suscripción** de 0,99 € al mes o 7,99 € al año (un 33 % menos) con
+  RevenueCat, que cobra por la App Store y Google Play. Los precios que se
+  enseñan son los de la tienda en la moneda de cada país. Incluye restaurar
+  compras, pagos pendientes, enlace para gestionar o cancelar y avisos claros
+  si algo falla. Vigilar la postura y las alertas siguen siendo gratis.
+- Sin claves de RevenueCat, en Expo Go o en la web, Labs sale como «no
+  disponible» y el resto de la app funciona igual. Los pasos para darlo de alta
+  están en el README.
+
+**Animaciones**
+
+- Las hojas (ajustes, Labs, estiramientos) suben con un muelle, oscurecen el
+  fondo a la vez y se cierran arrastrándolas hacia abajo; al bajar no rebotan.
+- El control segmentado desliza su pastilla hasta la opción elegida.
+- Las barras del informe semanal crecen escalonadas y la racha rebota al subir.
+- Todo sigue parándose con «reducir movimiento».
+
+**Calidad**
+
+- El panel de la feria decía que la webcam analiza treinta fotogramas por
+  segundo; por defecto son quince (treinta es el máximo).
+- En la web, un icono SVG dentro de un botón de cristal quedaba debajo del
+  desenfoque y se veía apagado.
+- 22 tests nuevos (145 en total).
+
 ## 1.1.2
 
 Material 3 Expressive encima del cristal de la 1.1.1, animaciones nuevas y una

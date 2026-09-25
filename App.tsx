@@ -1,20 +1,29 @@
 import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatDuration } from './src/core/format';
+import { FALLBACK_PRICES } from './src/core/labs';
 import { isAlerting } from './src/core/postureEngine';
+import { useLabs } from './src/hooks/useLabs';
 import { usePostureMonitor } from './src/hooks/usePostureMonitor';
 import { AlertOverlay } from './src/ui/AlertOverlay';
+import { StreakCard, WeeklyCard } from './src/ui/LabsCards';
+import { LabsSheet } from './src/ui/LabsSheet';
 import { Notice } from './src/ui/Notice';
 import { PostureGauge } from './src/ui/PostureGauge';
 import { ResultsCard } from './src/ui/ResultsCard';
 import { SettingsSheet } from './src/ui/SettingsSheet';
+import { StretchSheet } from './src/ui/StretchSheet';
 import { Appear } from './src/ui/expressive';
-import { AmbientBackground, Button, ButtonGroup, Card, IconButton, StatusPill, setUiHaptics } from './src/ui/glass';
-import { colors, phaseColors, roundedNumbers, spacing, type } from './src/ui/theme';
+import { AmbientBackground, Button, ButtonGroup, Card, GlassSurface, IconButton, StatusPill, setUiHaptics } from './src/ui/glass';
+import { Icon } from './src/ui/things';
+import { colors, continuous, phaseColors, radius, roundedNumbers, spacing, type } from './src/ui/theme';
+
+/** Lo que tarda en bajar una hoja antes de subir la siguiente. */
+const SHEET_SWAP_MS = 380;
 
 const STEPS = [
   'Guarda el móvil en el bolsillo del pecho o del pantalón, o sujétalo al cinturón.',
@@ -24,7 +33,10 @@ const STEPS = [
 
 export default function App() {
   const monitor = usePostureMonitor();
+  const labs = useLabs();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [labsVisible, setLabsVisible] = useState(false);
+  const [stretchVisible, setStretchVisible] = useState(false);
 
   const {
     engine,
@@ -44,8 +56,16 @@ export default function App() {
   const calibrating = calibration === 'calibrating';
   const graceProgress = engine.badMs / Math.max(1, settings.graceSeconds * 1000);
 
-  // Los toques suaves de la interfaz siguen el ajuste de vibración.
-  useEffect(() => setUiHaptics(settings.vibrationEnabled), [settings.vibrationEnabled]);
+  // Los toques suaves de la interfaz tienen su propio ajuste desde la 1.1.3.
+  useEffect(() => setUiHaptics(settings.uiHaptics), [settings.uiHaptics]);
+
+  // Los experimentos de Labs sólo aparecen con la suscripción activa.
+  const showStreaks = labs.active && settings.labsStreaks;
+  const showWeekly = labs.active && settings.labsWeekly;
+  const showStretches = labs.active && settings.labsStretches;
+  const showTeaser = !labs.active && (labs.status === 'ready' || labs.devUnlock != null);
+  const monthlyPrice = labs.offer?.monthly?.product.priceString ?? FALLBACK_PRICES.monthly.label;
+  const now = Date.now();
 
   // El fondo se tiñe con el estado; en control no se enseña el rojo de alerta.
   const accent =
@@ -73,7 +93,14 @@ export default function App() {
                 </Text>
                 <Text style={styles.tagline}>Si te agachas demasiado, te enteras.</Text>
               </View>
-              <IconButton glyph="⚙︎" onPress={() => setSettingsVisible(true)} accessibilityLabel="Abrir ajustes" />
+              <View style={styles.headerButtons}>
+                <IconButton
+                  icon={<Icon name="flask" size={21} color={labs.active ? colors.tint : colors.label} />}
+                  onPress={() => setLabsVisible(true)}
+                  accessibilityLabel="Abrir PostureFix Labs"
+                />
+                <IconButton glyph="⚙︎" onPress={() => setSettingsVisible(true)} accessibilityLabel="Abrir ajustes" />
+              </View>
             </Appear>
 
             <Appear index={1} style={styles.pills}>
@@ -188,6 +215,24 @@ export default function App() {
               />
             </Appear>
 
+            {showStreaks ? (
+              <Appear index={6}>
+                <StreakCard history={history} goalMinutes={settings.dailyGoalMinutes} now={now} />
+              </Appear>
+            ) : null}
+
+            {showStretches ? (
+              <Appear index={6}>
+                <Button
+                  label="Estirar dos minutos"
+                  onPress={() => setStretchVisible(true)}
+                  variant="glass"
+                  color={colors.yellow}
+                  accessibilityHint="Abre los estiramientos guiados"
+                />
+              </Appear>
+            ) : null}
+
             <Appear index={6}>
               <Card style={styles.stats}>
                 {stats.map((stat, index) => (
@@ -201,9 +246,36 @@ export default function App() {
               </Card>
             </Appear>
 
+            {showWeekly ? (
+              <Appear index={7}>
+                <WeeklyCard history={history} now={now} />
+              </Appear>
+            ) : null}
+
             <Appear index={7}>
               <ResultsCard history={history} />
             </Appear>
+
+            {showTeaser ? (
+              <Appear index={8}>
+                <Pressable
+                  onPress={() => setLabsVisible(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`PostureFix Labs, desde ${monthlyPrice} al mes`}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <GlassSurface material="thin" cornerRadius={radius.large} style={styles.teaser}>
+                    <View style={styles.teaserIcon}>
+                      <Icon name="flask" size={20} color={colors.onTint} />
+                    </View>
+                    <View style={styles.teaserText}>
+                      <Text style={styles.teaserTitle}>PostureFix Labs</Text>
+                      <Text style={styles.teaserBody}>Rachas, informe semanal y estiramientos. Desde {monthlyPrice} al mes.</Text>
+                    </View>
+                    <Text style={styles.chevron}>›</Text>
+                  </GlassSurface>
+                </Pressable>
+              </Appear>
+            ) : null}
 
             <Text style={styles.footer}>
               PostureFix {Constants.expoConfig?.version ?? ''} · La vigilancia necesita la app en primer plano: el sistema
@@ -222,6 +294,27 @@ export default function App() {
           onChange={monitor.updateSettings}
           onClearHistory={monitor.clearHistory}
           onClose={() => setSettingsVisible(false)}
+          labsActive={labs.active}
+          onOpenLabs={() => {
+            // Una hoja detrás de otra: iOS no presenta un modal mientras otro se cierra.
+            setSettingsVisible(false);
+            setTimeout(() => setLabsVisible(true), SHEET_SWAP_MS);
+          }}
+        />
+
+        <LabsSheet
+          visible={labsVisible}
+          onClose={() => setLabsVisible(false)}
+          labs={labs}
+          settings={settings}
+          onChange={monitor.updateSettings}
+        />
+
+        <StretchSheet
+          visible={stretchVisible}
+          onClose={() => setStretchVisible(false)}
+          voiceEnabled={settings.voiceEnabled}
+          vibrationEnabled={settings.vibrationEnabled}
         />
       </View>
     </SafeAreaProvider>
@@ -231,9 +324,25 @@ export default function App() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   safe: { flex: 1 },
-  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: 56, gap: spacing.lg },
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: 56, gap: spacing.xl },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   headerText: { flex: 1 },
+  headerButtons: { flexDirection: 'row', gap: spacing.sm },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
+  teaser: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
+  teaserIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.tint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...continuous,
+  },
+  teaserText: { flex: 1, gap: 2 },
+  teaserTitle: { ...type.headline, color: colors.label },
+  teaserBody: { ...type.footnote, color: colors.secondaryLabel },
+  chevron: { fontSize: 26, lineHeight: 28, color: colors.tertiaryLabel },
   brand: { ...type.largeTitle, color: colors.label },
   tagline: { ...type.subheadline, color: colors.secondaryLabel },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

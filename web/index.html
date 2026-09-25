@@ -99,8 +99,8 @@
         inset: 0;
         z-index: -1;
         background:
-          radial-gradient(circle at 0% 0%, rgba(255, 122, 41, 0.26), rgba(255, 122, 41, 0) 55%),
-          radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--glow) 34%, transparent), transparent 62%),
+          radial-gradient(circle at 0% 0%, rgba(255, 122, 41, 0.17), rgba(255, 122, 41, 0) 55%),
+          radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--glow) 24%, transparent), transparent 60%),
           var(--background);
       }
 
@@ -467,6 +467,8 @@
       }
       .segmented input:checked + label { background: #6b605b; color: var(--label); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); }
       .segmented input:focus-visible + label { outline: 3px solid var(--tint); outline-offset: 1px; }
+      .segmented-wide { display: flex; width: 100%; }
+      .segmented-wide label { flex: 1; text-align: center; }
 
       /* -------------------------------------------------------- resultados --- */
       .comparativa-fila { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -710,6 +712,20 @@
         </div>
 
         <div class="settings-column appear" style="--i: 7">
+          <div>
+            <h3 class="group-header">Hasta dónde avisa</h3>
+            <div class="group-body glass">
+              <div class="row">
+                <span class="segmented segmented-wide" id="set-nivel" role="radiogroup" aria-label="Hasta dónde avisa">
+                  <input type="radio" name="nivel" id="nivel-beep" value="beep" /><label for="nivel-beep">Pitido</label>
+                  <input type="radio" name="nivel" id="nivel-count" value="count" /><label for="nivel-count">Cuenta</label>
+                  <input type="radio" name="nivel" id="nivel-alarm" value="alarm" /><label for="nivel-alarm">Alarma</label>
+                </span>
+              </div>
+            </div>
+            <p class="group-footer" id="nivel-nota"></p>
+          </div>
+
           <div>
             <h3 class="group-header">Sonido y avisos</h3>
             <div class="group-body glass">
