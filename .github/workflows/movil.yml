@@ -62,8 +62,16 @@ jobs:
       - name: Generar el proyecto nativo
         run: |
           npx expo prebuild --platform android --no-install
-          # Las builds de React Native piden más memoria que la que trae la plantilla.
-          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" >> android/gradle.properties
+          # Las builds de React Native piden más memoria que la que trae la
+          # plantilla. Se cambia la línea en su sitio: el archivo no acaba en
+          # salto de línea y añadirla al final la pegaría a la última.
+          MEMORIA='org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8'
+          if grep -q '^org\.gradle\.jvmargs=' android/gradle.properties; then
+            sed -i "s/^org\.gradle\.jvmargs=.*/$MEMORIA/" android/gradle.properties
+          else
+            printf '\n%s\n' "$MEMORIA" >> android/gradle.properties
+          fi
+          grep -n 'jvmargs\|watchedDirectories' android/gradle.properties
 
       - name: Compilar el APK
         working-directory: android
