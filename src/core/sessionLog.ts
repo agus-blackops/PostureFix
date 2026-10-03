@@ -20,6 +20,8 @@ export interface SessionRecord {
   source: SessionSource;
   /** `false` en una sesión de control: se mide, pero no se avisa. */
   alertsEnabled: boolean;
+  /** Perfil con el que se vigiló (móvil 2.0); no existe en las sesiones antiguas. */
+  profile?: string;
 }
 
 export interface Summary {
@@ -92,7 +94,7 @@ export function compareModes(history: SessionRecord[]): Comparison {
 /** Historial en CSV, para llevárselo a una hoja de cálculo o al póster. */
 export function toCsv(history: SessionRecord[]): string {
   const rows = [
-    ['fecha', 'origen', 'avisos', 'duracion_min', 'encorvado_min', 'porcentaje_encorvado', 'alertas'],
+    ['fecha', 'origen', 'avisos', 'duracion_min', 'encorvado_min', 'porcentaje_encorvado', 'alertas', 'perfil'],
     ...history.map((record) => [
       new Date(record.startedAt).toISOString(),
       record.source,
@@ -101,6 +103,7 @@ export function toCsv(history: SessionRecord[]): string {
       (record.badMs / 60000).toFixed(2),
       (record.durationMs > 0 ? (record.badMs / record.durationMs) * 100 : 0).toFixed(1),
       String(record.alerts),
+      record.profile ?? '',
     ]),
   ];
   return rows.map((row) => row.join(',')).join('\n');
@@ -125,6 +128,7 @@ export function sanitizeHistory(raw: unknown): SessionRecord[] {
       alerts: record.alerts!,
       source: record.source === 'movil' ? 'movil' : 'webcam',
       alertsEnabled: record.alertsEnabled !== false,
+      ...(typeof record.profile === 'string' && /^[a-z-]{1,20}$/.test(record.profile) ? { profile: record.profile } : {}),
     });
   }
   return clean.sort((a, b) => b.startedAt - a.startedAt).slice(0, MAX_SESSIONS);

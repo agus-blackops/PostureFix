@@ -285,7 +285,7 @@ function downscale(canvas, size) {
   return out;
 }
 
-// Colores de src/ui/theme.ts: el fondo negro cálido con el resplandor naranja
+// Colores de src/theme/palettes.ts (tema oscuro): el fondo negro cálido con el resplandor naranja
 // de la marca arriba, como la app, y el trazo en el acento (`tint`).
 const SURFACE = [10, 7, 6];
 const SURFACE_TOP = [82, 38, 14];

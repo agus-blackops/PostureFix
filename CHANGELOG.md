@@ -1,5 +1,63 @@
 # Cambios
 
+## 2.0.0
+
+La app de móvil hecha de nuevo desde cero, con más precisión, ajustes nuevos, APK
+para Android y PostureFix Labs gratis tres meses. La versión para portátil y la de
+escritorio sólo cambian de número.
+
+**App nueva**
+
+- Pantallas, navegación y diseño rehechos: cuatro pestañas (**Hoy**, **Progreso**,
+  **Labs** y **Ajustes**) con una barra de cristal flotante, en vez de una pantalla
+  con hojas encima.
+- **Hoy**: el anillo con el ángulo y, con la calibración en dos pasos, cuánto es
+  hacia delante y cuánto hacia un lado; el perfil activo, avisos claros (sin
+  calibrar, móvil movido, fuera de horario, calibración temblorosa) y el próximo
+  descanso.
+- **Progreso**: racha, semana, el experimento y el historial juntos.
+- **Calibración guiada** en una hoja propia: cuenta atrás con voz, los dos pasos
+  con su barra, y un resumen al acabar (cuánto temblaba, cuánto te inclinaste).
+- El núcleo probado de la 1.x (la máquina de estados de la alerta, el filtro, la
+  detección de móvil movido, el historial) se mantiene con todos sus tests.
+
+**Más precisión**
+
+- **Fusión de sensores**: la gravedad sale de juntar acelerómetro y giroscopio
+  (`DeviceMotion`), ya separada del movimiento propio. Se puede seguir midiendo
+  al caminar y sólo se descartan los golpes de verdad. Sin giroscopio, vuelve al
+  acelerómetro solo.
+- **Calibración en dos pasos**: espalda recta y luego un poco inclinado hacia
+  delante. La app aprende qué es «delante» esté como esté el móvil en el
+  bolsillo y separa la inclinación hacia delante, hacia atrás y hacia los lados.
+  Echarse hacia atrás en la silla ya no cuenta como encorvarse.
+- **Ventana más quieta**: de los 3 s de calibración se usa el segundo y medio
+  más estable, así que el temblor de tocar la pantalla no entra en la medida.
+
+**Ajustes nuevos**
+
+- **Perfiles**: Sentado, De pie y En clase, cada uno con su calibración, su
+  umbral, su margen y hasta dónde avisa (En clase sólo pita).
+- **Horario de vigilancia**: días y franja horaria; fuera de horario no avisa ni
+  cuenta tiempo.
+- **Recordatorio para levantarse**: cada 15–120 minutos sentado (45 por
+  defecto); caminar un rato reinicia la cuenta.
+- **Tema claro**: claro, oscuro o el del sistema.
+- Al abrir la 2.0, la calibración y los ajustes de la 1.x pasan al perfil
+  Sentado.
+
+**App para móvil (APK)**
+
+- Nuevo workflow **App de móvil**: GitHub compila el APK de Android y, al
+  etiquetar una versión, lo adjunta al Release junto a los ejecutables de
+  escritorio (`PostureFix-2.0.0.apk`).
+
+**PostureFix Labs**
+
+- **Gratis 90 días** desde la primera vez que se abre la 2.0, sin tienda ni
+  datos; la pestaña de Labs dice cuántos días quedan. Después sigue la
+  suscripción de 0,99 €/mes o 7,99 €/año.
+
 ## 1.1.3
 
 Un aire a Things sobre el cristal y Expressive de la 1.1.2, ajustes nuevos,

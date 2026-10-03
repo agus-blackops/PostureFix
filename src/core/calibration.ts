@@ -75,3 +75,27 @@ export function calibrateVectors(
   const spreadDeg = medianDistance(samples, baseline, angleBetweenDeg);
   return { baseline, spreadDeg, steady: spreadDeg <= maxSpreadDeg };
 }
+
+/**
+ * La ventana más quieta de una grabación: la 2.0 graba unos segundos y se
+ * queda con el tramo de `windowSize` lecturas que menos baila, en vez de con
+ * todo. Así no cuenta el momento de guardar el móvil ni el de acomodarse.
+ */
+export function mostStableWindow(samples: Vector3[], windowSize: number): Vector3[] {
+  if (samples.length <= windowSize) return samples;
+  let best = samples.slice(0, windowSize);
+  let bestSpread = Infinity;
+  const step = Math.max(1, Math.floor(windowSize / 4));
+  for (let start = 0; start + windowSize <= samples.length; start += step) {
+    const window = samples.slice(start, start + windowSize);
+    const center = medianVector(window);
+    if (!center) continue;
+    const spread = medianDistance(window, center, angleBetweenDeg);
+    // Ante empate gana la más tardía: la persona ya se ha acomodado.
+    if (spread <= bestSpread) {
+      best = window;
+      bestSpread = spread;
+    }
+  }
+  return best;
+}

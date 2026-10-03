@@ -2,17 +2,18 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-import { DEFAULT_SETTINGS, LIMITS, sanitize } from '../settings';
+import { DEFAULT_PROFILES } from '../profiles';
+import { DEFAULT_SETTINGS, LIMITS, activeProfileOf, migrateV1, sanitize, withProfile } from '../settings';
 
-describe('sanitize (ajustes del móvil)', () => {
+describe('sanitize (ajustes del móvil, v2)', () => {
   it('sin nada guardado devuelve los valores por defecto', () => {
     expect(sanitize(null)).toEqual(DEFAULT_SETTINGS);
     expect(sanitize(undefined)).toEqual(DEFAULT_SETTINGS);
   });
 
   it('conserva los valores válidos', () => {
-    const stored = { ...DEFAULT_SETTINGS, thresholdDeg: 30, voiceEnabled: false, baseline: { x: 0, y: -1, z: 0 } };
-    expect(sanitize(stored)).toEqual(stored);
+    const stored = withProfile({ ...DEFAULT_SETTINGS, theme: 'light' as const, standReminder: true }, 'clase', { thresholdDeg: 30 });
+    expect(sanitize(JSON.parse(JSON.stringify(stored)))).toEqual(stored);
   });
 
   it('un sí/no guardado como texto no se toma por verdadero', () => {
@@ -21,47 +22,53 @@ describe('sanitize (ajustes del móvil)', () => {
     expect(result.voiceEnabled).toBe(DEFAULT_SETTINGS.voiceEnabled);
   });
 
-  it('los números corruptos vuelven a su valor por defecto', () => {
-    const result = sanitize({ volume: 'mucho', thresholdDeg: null, graceSeconds: {} });
-    expect(result.volume).toBe(DEFAULT_SETTINGS.volume);
-    expect(result.thresholdDeg).toBe(DEFAULT_SETTINGS.thresholdDeg);
-    expect(result.graceSeconds).toBe(DEFAULT_SETTINGS.graceSeconds);
-  });
-
-  it('recorta los valores fuera de rango', () => {
-    const result = sanitize({ thresholdDeg: 500, volume: 0 });
-    expect(result.thresholdDeg).toBe(LIMITS.thresholdDeg.max);
+  it('recorta los números y descarta opciones desconocidas', () => {
+    const result = sanitize({
+      volume: 0,
+      standEveryMinutes: 1000,
+      theme: 'neón',
+      activeProfile: 'tumbado',
+      profiles: { sentado: { thresholdDeg: 500, maxAlertLevel: 'sirena' } },
+    } as never);
     expect(result.volume).toBe(LIMITS.volume.min);
-  });
-
-  it('descarta una calibración a medias', () => {
-    expect(sanitize({ baseline: { x: 0, y: Number.NaN, z: 1 } }).baseline).toBeNull();
-    expect(sanitize({ baseline: { x: 0, y: 1 } }).baseline).toBeNull();
+    expect(result.standEveryMinutes).toBe(LIMITS.standEveryMinutes.max);
+    expect(result.theme).toBe('system');
+    expect(result.activeProfile).toBe('sentado');
+    expect(result.profiles.sentado.thresholdDeg).toBe(55);
+    expect(result.profiles.sentado.maxAlertLevel).toBe(DEFAULT_PROFILES.sentado.maxAlertLevel);
   });
 
   it('no arrastra claves desconocidas', () => {
-    expect(Object.keys(sanitize({ ...DEFAULT_SETTINGS, basura: 1 } as never)).sort()).toEqual(
-      Object.keys(DEFAULT_SETTINGS).sort()
-    );
+    expect(Object.keys(sanitize({ ...DEFAULT_SETTINGS, basura: 1 } as never)).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
   });
 
-  it('solo acepta niveles de aviso conocidos', () => {
-    expect(sanitize({ maxAlertLevel: 'count' }).maxAlertLevel).toBe('count');
-    expect(sanitize({ maxAlertLevel: 'sirena' }).maxAlertLevel).toBe(DEFAULT_SETTINGS.maxAlertLevel);
+  it('cada perfil guarda lo suyo', () => {
+    const settings = withProfile({ ...DEFAULT_SETTINGS, activeProfile: 'de-pie' }, 'de-pie', { graceSeconds: 8 });
+    expect(activeProfileOf(settings).graceSeconds).toBe(8);
+    expect(settings.profiles.sentado.graceSeconds).toBe(DEFAULT_PROFILES.sentado.graceSeconds);
+  });
+});
+
+describe('migrateV1', () => {
+  it('pasa la calibración y los límites de la 1.x al perfil «Sentado»', () => {
+    const migrated = migrateV1({
+      baseline: { x: 0, y: -0.98, z: 0.1 },
+      thresholdDeg: 28,
+      graceSeconds: 6,
+      maxAlertLevel: 'count',
+      volume: 0.6,
+      controlMode: true,
+    });
+    expect(migrated.activeProfile).toBe('sentado');
+    expect(migrated.profiles.sentado).toMatchObject({ thresholdDeg: 28, graceSeconds: 6, maxAlertLevel: 'count' });
+    expect(migrated.profiles.sentado.frame?.forward).toBeNull();
+    expect(migrated.profiles.sentado.frame?.up.y).toBeLessThan(-0.9);
+    expect(migrated).toMatchObject({ volume: 0.6, controlMode: true });
+    expect(migrated.profiles['de-pie']).toEqual(DEFAULT_PROFILES['de-pie']);
   });
 
-  it('los ajustes guardados por la 1.1.2 toman los nuevos por defecto', () => {
-    const { maxAlertLevel, uiHaptics, dailyGoalMinutes, labsStreaks, labsWeekly, labsStretches, ...old } = {
-      ...DEFAULT_SETTINGS,
-      thresholdDeg: 25,
-    };
-    const result = sanitize(old);
-    expect(result.thresholdDeg).toBe(25);
-    expect(result).toMatchObject({ maxAlertLevel, uiHaptics, dailyGoalMinutes, labsStreaks, labsWeekly, labsStretches });
-  });
-
-  it('recorta el objetivo diario a su rango', () => {
-    expect(sanitize({ dailyGoalMinutes: 1 }).dailyGoalMinutes).toBe(LIMITS.dailyGoalMinutes.min);
-    expect(sanitize({ dailyGoalMinutes: 9999 }).dailyGoalMinutes).toBe(LIMITS.dailyGoalMinutes.max);
+  it('una 1.x sin calibrar deja el perfil sin calibrar', () => {
+    expect(migrateV1({ baseline: null }).profiles.sentado.frame).toBeNull();
+    expect(migrateV1(null)).toEqual(DEFAULT_SETTINGS);
   });
 });

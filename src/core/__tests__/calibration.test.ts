@@ -69,3 +69,19 @@ describe('calibration', () => {
     expect(medianDistance([], centro, (s, c) => Math.abs(s - c))).toBe(0);
   });
 });
+
+describe('mostStableWindow', () => {
+  it('se queda con el tramo más quieto de la grabación', () => {
+    const { mostStableWindow } = require('../calibration') as typeof import('../calibration');
+    const meneo = Array.from({ length: 20 }, (_, i) => ({ x: Math.sin(i) * 0.4, y: -0.9, z: Math.cos(i) * 0.4 }));
+    const quieto = Array.from({ length: 20 }, () => ({ x: 0, y: -1, z: 0 }));
+    const window = mostStableWindow([...meneo, ...quieto], 16);
+    expect(window).toHaveLength(16);
+    expect(window.every((v) => v.y === -1)).toBe(true);
+  });
+
+  it('con menos muestras que la ventana devuelve todas', () => {
+    const { mostStableWindow } = require('../calibration') as typeof import('../calibration');
+    expect(mostStableWindow([{ x: 0, y: -1, z: 0 }], 10)).toHaveLength(1);
+  });
+});

@@ -115,8 +115,10 @@ jobs:
             gh release edit "$ETIQUETA" --title "PostureFix $ETIQUETA" --notes-file notas.md
             gh release upload "$ETIQUETA" "${ARCHIVOS[@]}" --clobber
           else
+            # Si el workflow del móvil lo crea a la vez, se sube a ese.
             gh release create "$ETIQUETA" \
               --title "PostureFix $ETIQUETA" \
               --notes-file notas.md \
-              "${ARCHIVOS[@]}"
+              "${ARCHIVOS[@]}" \
+              || { sleep 20; gh release upload "$ETIQUETA" "${ARCHIVOS[@]}" --clobber; }
           fi

@@ -442,7 +442,7 @@ function render(): void {
         : (settings.controlMode ? 'Sesión de control · ' : '') +
           CAUSE_LABEL[deviation >= settings.thresholdDeg ? cause : 'none'];
 
-  // Los mismos colores por fase que el móvil (phaseColors en src/ui/theme.ts).
+  // Los mismos colores por fase que el móvil (phaseColor en src/theme/index.tsx).
   // En una sesión de control nada pasa del amarillo: no se está avisando.
   const warned = !settings.controlMode;
   const color =

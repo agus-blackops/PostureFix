@@ -81,7 +81,7 @@ describe('sessionLog', () => {
   it('exporta un CSV con cabecera y una fila por sesión', () => {
     const csv = toCsv([session({ durationMs: minutes(20), badMs: minutes(5), alertsEnabled: false })]);
     const [cabecera, fila] = csv.split('\n');
-    expect(cabecera).toBe('fecha,origen,avisos,duracion_min,encorvado_min,porcentaje_encorvado,alertas');
+    expect(cabecera).toBe('fecha,origen,avisos,duracion_min,encorvado_min,porcentaje_encorvado,alertas,perfil');
     expect(fila).toContain('control');
     expect(fila).toContain('20.00');
     expect(fila).toContain('25.0');
@@ -103,5 +103,15 @@ describe('sessionLog', () => {
   it('no se rompe con un historial corrupto', () => {
     expect(sanitizeHistory(null)).toEqual([]);
     expect(sanitizeHistory({ vaya: 'no' })).toEqual([]);
+  });
+
+  it('conserva el perfil de las sesiones de la 2.0 y descarta uno corrupto', () => {
+    const [con, corrupto] = sanitizeHistory([
+      session({ startedAt: 20, profile: 'de-pie' }),
+      { ...session({ startedAt: 10 }), profile: '<script>' },
+    ]);
+    expect(con.profile).toBe('de-pie');
+    expect(corrupto).not.toHaveProperty('profile');
+    expect(toCsv([con]).split('\n')[1].endsWith(',de-pie')).toBe(true);
   });
 });

@@ -70,3 +70,16 @@ export async function sendPostureAlert(title: string, body: string, enabled: boo
     // La notificación es un extra: la alarma sonora ya está sonando.
   }
 }
+
+/** Recordatorio suave para levantarse: sin prioridad máxima ni alerta crítica. */
+export async function sendReminder(title: string, body: string, enabled: boolean): Promise<void> {
+  if (!enabled) return;
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: false, color: '#FF7A29' },
+      trigger: Platform.OS === 'android' ? { channelId: CHANNEL_ID } : null,
+    });
+  } catch {
+    // Si no se puede notificar, ya lo ha dicho la voz.
+  }
+}

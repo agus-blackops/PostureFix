@@ -1,40 +1,56 @@
 # PostureFix
 
-App móvil (iOS y Android) que vigila tu postura con el acelerómetro del teléfono: si te
+App móvil (iOS y Android) que vigila tu postura con los sensores de movimiento del teléfono: si te
 agachas demasiado tiempo, suena un pitido fuerte que te pega el susto; si sigues agachado,
 la voz cuenta **"uno… dos… tres"** y salta una alerta fuerte con notificación de máxima
 prioridad, vibración larga y un tono continuo. Con auriculares puestos, ese tono es la señal
 de atención **EAS** (853 Hz + 960 Hz), la misma que precede a los avisos de tornado.
 
 Hecha con Expo (React Native + TypeScript). Hay dos versiones que comparten la misma
-secuencia de alerta: la **app de móvil**, que mide con el acelerómetro, y la
+secuencia de alerta: la **app de móvil**, que mide con el acelerómetro y el giroscopio, y la
 **versión para portátil**, que mide con la webcam.
+
+La **2.0** rehace la app de móvil desde cero (pantallas, navegación y diseño) sobre el mismo
+núcleo probado, y mide con más precisión: gravedad de la fusión de sensores, calibración en dos
+pasos que sabe distinguir encorvarse de echarse hacia atrás, y perfiles para sentado, de pie y
+en clase. La versión para portátil sólo cambia de número.
 
 ## Cómo funciona
 
 ### Detección
 
-El acelerómetro mide el vector de la gravedad en los ejes del teléfono. Al calibrar con la
-espalda recta se guarda ese vector; a partir de ahí, **el ángulo entre el vector guardado y
-el actual es cuánto te has inclinado**. Girar sobre ti mismo no cambia ese ángulo, así que
-el método sólo reacciona a agacharse o ladearse, no a cambiar de orientación.
+El teléfono sabe hacia dónde cae la gravedad en sus propios ejes. Al calibrar con la espalda
+recta se guarda esa dirección; a partir de ahí, **el ángulo entre la gravedad guardada y la
+actual es cuánto te has inclinado**. Girar sobre ti mismo no cambia ese ángulo, así que el
+método sólo reacciona a agacharse o ladearse, no a cambiar de orientación.
 
-- Las lecturas se suavizan con un filtro paso bajo (τ = 300 ms) para ignorar temblores.
-- Las muestras cuyo módulo se aleja de 1 g más de 0,22 g se descartan: si caminas o mueves
-  el móvil, la aceleración propia falsearía el ángulo, así que los contadores se congelan.
+- **Fusión de sensores** (2.0): la gravedad se pide a `DeviceMotion`, que iOS y Android
+  calculan juntando acelerómetro y giroscopio, y llega ya separada del movimiento propio. Al
+  caminar apenas tiembla, así que se puede seguir midiendo. Si el móvil no tiene giroscopio
+  (o no da lecturas completas en 1,5 s), se vuelve al acelerómetro solo, como en la 1.x.
+- **Calibración en dos pasos** (2.0): primero con la espalda recta y luego inclinándote un
+  poco hacia delante. Con el segundo paso la app aprende qué es «delante» en los ejes del
+  móvil, esté como esté en el bolsillo, y separa la inclinación en **hacia delante/atrás** y
+  **hacia un lado**. Echarse hacia atrás en la silla ya no cuenta como encorvarse (se puede
+  activar si se quiere). Con un solo paso se mide el ángulo total, como antes.
+- Las lecturas se suavizan con un filtro adaptativo (ver [Cómo se afina la medida](#cómo-se-afina-la-medida)).
+- Se descartan las lecturas con un golpe de verdad (más de 0,45 g de aceleración propia con
+  fusión; con el acelerómetro solo, las que se alejan de 1 g más de 0,22 g): los contadores
+  se congelan en vez de avisar de algo que no ha pasado.
 - La entrada y salida del estado "agachado" usan histéresis (6°) para que no parpadee.
 
 ### Secuencia de alerta
 
 | Paso | Cuándo | Qué pasa |
 | --- | --- | --- |
-| 1 | Te agachas más del umbral (22° por defecto) | La barra de margen empieza a llenarse |
-| 2 | Sigues agachado 4 s (configurable) | **Pitido fuerte** de dos tonos + vibración |
+| 1 | Te agachas más del umbral (22° sentado, 20° de pie) | La barra de margen empieza a llenarse |
+| 2 | Sigues agachado 4 s (5 s de pie; configurable) | **Pitido fuerte** de dos tonos + vibración |
 | 3 | Sigues agachado 1,6 s más | La voz cuenta **"uno… dos… tres"** con números a pantalla completa |
 | 4 | Sigues agachado | **Alerta fuerte**: notificación de máxima prioridad, pantalla roja parpadeante, vibración en bucle y tono continuo (**EAS** con auriculares, sirena de dos tonos por altavoz) |
 | 5 | Te enderezas 0,8 s | Todo se apaga, la voz dice "Bien, espalda recta" y empieza un descanso de 4 s |
 
-Por seguridad la alarma nunca suena más de 45 s seguidos.
+Por seguridad la alarma nunca suena más de 45 s seguidos. Cada perfil puede quedarse en el
+pitido o en la cuenta (el de clase, por defecto, sólo pita).
 
 ### Auriculares
 
@@ -44,6 +60,9 @@ conectan o desconectan auriculares de cable, USB o Bluetooth. En Expo Go, donde 
 nativo no está compilado, la app cae en el interruptor **"Llevo auriculares"** de los ajustes.
 
 ## Ejecutar (móvil)
+
+La forma fácil en Android es descargar el **APK** de [Releases](https://github.com/agus-blackops/PostureFix/releases)
+(ver [Descargarla ya hecha](#descargarla-ya-hecha)). Para trabajar en el código:
 
 ```bash
 npm install
@@ -60,7 +79,7 @@ npx expo run:android    # o: npx expo run:ios   (requiere macOS + Xcode)
 ### Comprobaciones
 
 ```bash
-npm test        # máquina de estados, trigonometría y medición por webcam
+npm test        # máquina de estados, sensores, calibración, horario, prueba gratis y webcam
 npm run typecheck
 npm run assets  # regenera sonidos e iconos
 ```
@@ -130,18 +149,27 @@ cosas que el navegador no puede:
 ### Descargarla ya hecha
 
 Las versiones publicadas están en **[Releases](https://github.com/agus-blackops/PostureFix/releases)**,
-con los ejecutables adjuntos: no caducan y se descargan sin iniciar sesión. Se publican solas al
-etiquetar una versión (`git tag v1.0.1 && git push origin v1.0.1`).
+con los ejecutables y el APK de Android adjuntos: no caducan y se descargan sin iniciar sesión.
+Se publican solos al etiquetar una versión (`git tag v2.0.0 && git push origin v2.0.0`): el
+workflow **App de escritorio** sube los de Windows y Linux y el workflow **App de móvil**, el APK.
 
-Para probar un cambio que aún no es versión, cada ejecución del workflow **App de escritorio**
-deja los mismos archivos como artefactos: pestaña *Actions* → la ejecución más reciente →
-sección *Artifacts* (caducan a los 90 días y piden sesión):
+Para probar un cambio que aún no es versión, cada ejecución de esos workflows deja los mismos
+archivos como artefactos: pestaña *Actions* → la ejecución más reciente → sección *Artifacts*
+(caducan a los 90 días y piden sesión):
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-portable-1.1.3.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-1.1.3.exe` | Windows con instalador y acceso directo |
-| `PostureFix-1.1.3.AppImage` | Linux |
+| `PostureFix-2.0.0.apk` | Android: se descarga en el móvil y se instala |
+| `PostureFix-portable-2.0.0.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-2.0.0.exe` | Windows con instalador y acceso directo |
+| `PostureFix-2.0.0.AppImage` | Linux |
+
+**Instalar el APK**: ábrelo desde el móvil y, si Android lo pide, permite instalar apps de
+esa fuente (el navegador o la app de archivos). Está firmado con una clave de pruebas, no
+con la de Google Play, así que Android avisa de que viene de fuera de la tienda; para
+actualizar a una versión nueva puede hacer falta desinstalar la anterior. En iPhone no hay
+equivalente: instalar fuera de la App Store exige una cuenta de desarrollador de Apple
+(`npx expo run:ios` desde un Mac, o EAS).
 
 ### Construirla uno mismo
 
@@ -161,7 +189,7 @@ Windows y el AppImage desde Linux. Por eso el workflow los construye en los runn
 ## Cómo se afina la medida
 
 El ángulo que ve el usuario pasa por tres filtros pensados para que sea exacto y
-puntual a la vez:
+puntual a la vez (en el móvil, a 20 lecturas por segundo):
 
 1. **Mediana de las tres últimas lecturas.** Descarta por completo un valor suelto
    disparatado —el fotograma en el que el detector coloca un hombro donde no está—,
@@ -169,16 +197,25 @@ puntual a la vez:
 2. **Filtro adaptativo «one euro».** Con la persona quieta suaviza mucho; en cuanto
    la señal se mueve de verdad, se abre y deja pasar el cambio. Sobre un escalón de
    40°, a los 200 ms va por 38,7° donde el paso bajo fijo de la 1.0.1 iba por 22,6°.
-3. **Descarte de lecturas imposibles.** En el móvil, las que se alejan de 1 g más de
-   0,22 g (estás caminando); en la webcam, los fotogramas donde no se te ve bien.
+3. **Descarte de lecturas imposibles.** En el móvil, los golpes de verdad (con la
+   gravedad fusionada se sigue midiendo al caminar; sin giroscopio, las lecturas que se
+   alejan de 1 g más de 0,22 g); en la webcam, los fotogramas donde no se te ve bien.
 
-La calibración usa la **mediana** de las muestras, no la media, y mide su dispersión
-para avisarte si te movías mientras calibrabas. Y si tras un meneo el ángulo da un
-salto grande, la app supone que le han movido el sensor: pausa la vigilancia y pide
-recalibrar en vez de avisar de una postura que no existe.
+Y en la calibración del móvil (2.0):
 
-`src/core/oneEuro.ts`, `src/core/calibration.ts` y `src/core/reposition.ts` son puros
-y están cubiertos por tests.
+- Se graban **3 s** con la espalda recta y se usa el **segundo y medio más quieto**: el
+  temblor de después de tocar la pantalla y de guardarse el móvil no entra en la medida.
+  Del paso inclinado se graban 2 s y se usa el segundo más quieto.
+- Se usa la **mediana** de las muestras, no la media, y se mide su dispersión para avisarte
+  si te movías mientras calibrabas.
+- Si en el segundo paso te inclinas menos de 8°, no basta para saber dónde está «delante»:
+  la app se queda con la calibración de un paso y te lo dice.
+
+Si tras un meneo el ángulo da un salto grande, la app supone que le han movido el sensor:
+pausa la vigilancia y pide recalibrar en vez de avisar de una postura que no existe.
+
+`src/core/motion.ts`, `src/core/bodyFrame.ts`, `src/core/oneEuro.ts`,
+`src/core/calibration.ts` y `src/core/reposition.ts` son puros y están cubiertos por tests.
 
 ## Medir si funciona (el experimento)
 
@@ -200,26 +237,42 @@ falta alguno de los dos grupos no inventa una conclusión, lo dice.
 
 ## Ajustes
 
-Desde el engranaje de la pantalla principal:
+En la app de móvil están en la pestaña **Ajustes** (la 2.0 se organiza en cuatro pestañas:
+Hoy, Progreso, Labs y Ajustes):
 
-- **Umbral de agachado** (10°–55°) y **margen antes del pitido** (1–20 s).
-- **Volumen** de las alertas.
-- **Tono EAS con auriculares** y **tono EAS siempre** (también por altavoz).
-- **Voz**, **vibración**, **notificación** y **mantener la pantalla encendida**.
+- **Perfiles** (2.0): **Sentado**, **De pie** y **En clase**. Cada uno guarda su calibración,
+  su umbral, su margen y hasta dónde avisa, porque el móvil queda distinto en el bolsillo
+  sentado que de pie. Se cambia de perfil desde Hoy o desde Ajustes.
+- **Umbral de agachado** (10°–55°), **margen antes del pitido** (1–20 s) y **no contar
+  echarse atrás**, por perfil.
 - **Hasta dónde avisa**: solo el pitido, pitido y cuenta, o la secuencia entera con la
   alarma. En clase o en una biblioteca, la alarma sobra.
+- **Horario de vigilancia** (2.0): días de la semana y franja (por ejemplo, L–V de 16:00 a
+  20:00; puede cruzar la medianoche). Fuera de horario la app no avisa ni cuenta tiempo,
+  aunque esté vigilando, y dice cuándo vuelve.
+- **Recordatorio para levantarse** (2.0): cada 15–120 minutos (45 por defecto) sentado, la
+  voz y una notificación te piden levantarte. Caminar unos 20 s seguidos cuenta como
+  descanso y reinicia la cuenta. En el perfil De pie y en la sesión de control no avisa.
+- **Volumen** de las alertas, **tono EAS con auriculares** y **tono EAS siempre**.
+- **Voz**, **vibración**, **notificación** y **mantener la pantalla encendida**.
+- **Tema** (2.0): el del sistema, claro u oscuro.
 - **Toques al pulsar**: la vibración suave de botones e interruptores, aparte de la de las
   alertas.
 - En la versión de portátil, **precisión del detector** (modelo grande o ligero) y
   **modo feria**, que deja los tiempos cortos para enseñarlo en un stand.
+
+Al abrir la 2.0 por primera vez, la calibración y los ajustes de la 1.x pasan al perfil
+Sentado (calibración de un paso: conviene repetirla en dos para separar delante y atrás).
 
 El botón **Probar alerta** reproduce la secuencia hasta el nivel elegido sin tener que
 agacharse.
 
 ## PostureFix Labs
 
-Experimentos de la app de móvil que se abren con una suscripción barata (0,99 € al mes o
-7,99 € al año). Vigilar la postura y todas las alertas siguen siendo gratis.
+Experimentos de la app de móvil. Desde la 2.0 están **gratis 90 días** desde la primera vez
+que se abre la 2.0, sin tienda, sin cuenta y sin pedir ningún dato; después se siguen usando
+con una suscripción barata (0,99 € al mes o 7,99 € al año). Vigilar la postura y todas las
+alertas siguen siendo gratis siempre.
 
 - **Objetivo diario y rachas**: minutos de buena postura al día, días seguidos
   cumpliéndolo e insignias.
@@ -229,7 +282,9 @@ Experimentos de la app de móvil que se abren con una suscripción barata (0,99 
   con temporizador y voz.
 
 Todo sale del historial de sesiones que ya se guardaba para el experimento
-(`src/core/progress.ts` y `src/core/stretches.ts`, puros y con tests).
+(`src/core/progress.ts` y `src/core/stretches.ts`, puros y con tests). La cuenta de la prueba
+gratis está en `src/core/trial.ts`: el día de inicio se guarda en el móvil y, si se atrasa el
+reloj, la prueba nunca pasa de 90 días.
 
 ### Cobrar la suscripción
 
@@ -246,10 +301,12 @@ Google Play. Para que funcionen hace falta, una sola vez:
 5. Una build de desarrollo o de tienda (`npx expo run:ios` / `run:android` o EAS): en Expo Go
    no hay módulo nativo de compras.
 
-Sin claves, o en la web, Labs sale como «no disponible» y la app funciona igual. En una build
-de desarrollo sin tienda aparece un botón para probar Labs sin pagar; en producción no existe.
+Sin claves, o en la web, la tienda sale como «no disponible»: durante la prueba gratis Labs
+funciona igual y, al acabar, se cierra hasta que haya tienda. Para que el APK de GitHub lleve
+la clave de Android, se guarda como secreto del repositorio `REVENUECAT_ANDROID_KEY`.
 Antes de publicar en la App Store, Apple pide que la pantalla de suscripción enlace a unas
-condiciones de uso y a una política de privacidad.
+condiciones de uso y a una política de privacidad, y revisa con lupa las pruebas gratis que no
+pasan por la tienda: para publicarla allí conviene usar la prueba gratis de la propia App Store.
 
 ## Recursos generados
 
@@ -264,7 +321,7 @@ sonidos y los iconos que se versionan en `assets/`:
 
 ## Versiones
 
-`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **1.1.3**, la
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **2.0.0**, la
 que va a la feria.
 
 ## Panel para la feria
@@ -277,16 +334,26 @@ para imprimirse (lleva sus propios estilos de impresión).
 ## Estructura
 
 ```
-App.tsx                      pantalla principal (móvil)
+App.tsx                      entrada de la app de móvil
+src/app/Root.tsx             las cuatro pestañas, las hojas y la alerta a pantalla completa
+src/app/useMonitor.ts        une sensores + calibración + horario + recordatorio + avisos
+src/app/useLabsAccess.ts     prueba gratis de 90 días y suscripción de Labs
+src/screens/                 Hoy, Progreso, Labs, Ajustes, calibración y estiramientos
+src/components/              piezas de la interfaz: cristal, controles, listas, anillo, hoja, pestañas
+src/theme/                   tema claro y oscuro: colores, materiales, esquinas y tipografía
 src/core/postureEngine.ts    máquina de estados pura de la alerta (con tests)
-src/core/orientation.ts      trigonometría del acelerómetro (con tests)
-src/core/settings.ts         ajustes persistidos en AsyncStorage
+src/core/motion.ts           gravedad fusionada o del acelerómetro, y si te mueves (con tests)
+src/core/bodyFrame.ts        ejes del cuerpo de la calibración en dos pasos (con tests)
+src/core/calibration.ts      mediana, dispersión y ventana más quieta (con tests)
+src/core/orientation.ts      trigonometría de los vectores (con tests)
+src/core/oneEuro.ts          filtro adaptativo «one euro» (con tests)
+src/core/reposition.ts       detecta que han movido el móvil de sitio (con tests)
+src/core/profiles.ts         perfiles sentado, de pie y en clase
+src/core/schedule.ts         horario de vigilancia (con tests)
+src/core/reminder.ts         recordatorio para levantarse (con tests)
+src/core/trial.ts            prueba gratis de Labs (con tests)
+src/core/settings.ts         ajustes persistidos y paso de la 1.x a la 2.0 (con tests)
 src/core/sessionLog.ts       historial de sesiones y comparación (con tests)
-src/services/               audio, voz, vibración y notificaciones
-src/hooks/usePostureMonitor  une sensor + máquina de estados + avisos
-src/ui/theme.ts              diseño: colores, materiales de cristal, esquinas y tipografía
-src/ui/glass.tsx             componentes de cristal (botones, tarjetas, anillo, listas, ajustes)
-src/ui/expressive.tsx        Material 3 Expressive: anillo ondulado, formas, carga y entradas
 src/core/spring.ts           muelles de Material 3 Expressive para RN y CSS (con tests)
 src/core/shapes.ts           geometría de la onda y de las formas que se transforman (con tests)
 src/core/expression.ts       urgencia y forma de cada fase, igual en móvil y portátil
@@ -295,14 +362,7 @@ src/core/validate.ts         lectura defensiva de los ajustes guardados
 src/core/progress.ts         Labs: objetivo diario, rachas, insignias e informe semanal (con tests)
 src/core/stretches.ts        Labs: rutinas de estiramientos y su reloj (con tests)
 src/core/labs.ts             Labs: productos, precios de reserva y experimentos
-src/services/purchases.ts    suscripción de Labs con RevenueCat
-src/hooks/useLabs.ts         estado de la suscripción para la interfaz
-src/ui/things.tsx            piezas al estilo de Things: casilla, quesito, iconos, segmentado
-src/ui/Sheet.tsx             hoja de cristal con muelle que se cierra arrastrando
-src/ui/LabsSheet.tsx         pantalla de Labs y de la suscripción
-src/ui/LabsCards.tsx         tarjetas de «Hoy» y «Tu semana»
-src/ui/StretchSheet.tsx      estiramientos guiados
-src/ui/                      el resto de la interfaz
+src/services/                audio, voz, vibración, notificaciones y compras (RevenueCat)
 modules/headphones/          módulo nativo de detección de auriculares (Kotlin + Swift)
 scripts/generate-assets.mjs  generador de sonidos e iconos
 web/                         versión para portátil: webcam + MediaPipe Pose
@@ -311,7 +371,7 @@ web/src/expressive.ts        anillo, formas y muelles de la versión de portáti
 web/build.mjs                empaquetado con esbuild
 desktop/main.js              envoltorio de escritorio (Electron)
 docs/panel-feria.html        panel explicativo para el stand
-.github/workflows/           construcción de los ejecutables
+.github/workflows/           construcción de los ejecutables y del APK
 ```
 
 La lógica de la secuencia vive en una función pura (`step()`), compartida por las dos
@@ -320,11 +380,13 @@ recuperación, histéresis y cortes de seguridad— sin sensores, cámara ni son
 
 ## Limitaciones
 
-- **La app tiene que estar en primer plano.** iOS y Android cortan el acelerómetro cuando la
+- **La app tiene que estar en primer plano.** iOS y Android cortan los sensores cuando la
   pantalla se bloquea, por eso PostureFix mantiene la pantalla encendida mientras vigila.
 - La detección asume que el teléfono se mueve con el torso: bolsillo del pecho, del pantalón
   o sujeto al cinturón. Sobre la mesa no mide nada útil.
-- Si cambias el móvil de sitio o de bolsillo, vuelve a calibrar.
+- Si cambias el móvil de sitio o de bolsillo, vuelve a calibrar (cada perfil tiene la suya).
+- El APK de GitHub es para probar y para la feria, no para la tienda: va firmado con una clave
+  de pruebas.
 - En la versión de webcam hay que estar encuadrado y con algo de luz; con la tapa cerrada o
   la cámara tapada no hay medición posible.
 - El tono EAS es una reproducción local de las dos frecuencias de la señal de atención; la
