@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0706" />
+    <title>PostureFix · versión webcam</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0706'/%3E%3Ccircle cx='12' cy='10' r='3.4' fill='%23ff7a29'/%3E%3Cpath d='M11.6 14 C9.5 18 12 21 15.5 22.4' stroke='%23ff7a29' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M15 22.6 H23' stroke='%23ff7a29' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <style>
+      /* ---------------------------------------------------------------------
+         Sistema de diseño de la 1.1.1: materiales de cristal al estilo de
+         Apple. Los mismos colores y nombres que la app de móvil
+         (src/ui/theme.ts): label / secondaryLabel para el texto, fill para los
+         rellenos, tint para el acento y los colores de estado del sistema.
+         --------------------------------------------------------------------- */
+      @property --glow {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #a39890;
+      }
+
+      :root {
+        --background: #0a0706;
+        --tint: #ff7a29;
+        --on-tint: #1f0c02;
+
+        --label: #ffffff;
+        --secondary-label: rgba(246, 236, 230, 0.64);
+        --tertiary-label: rgba(246, 236, 230, 0.38);
+        --quaternary-label: rgba(246, 236, 230, 0.2);
+        --separator: rgba(255, 240, 230, 0.12);
+
+        --fill: rgba(130, 120, 118, 0.36);
+        --secondary-fill: rgba(130, 120, 118, 0.28);
+        --tertiary-fill: rgba(130, 120, 118, 0.2);
+        --quaternary-fill: rgba(130, 120, 118, 0.14);
+
+        --neutral: #a39890;
+        --green: #30d158;
+        --yellow: #ffd60a;
+        --red: #ff453a;
+        --on-status: #141009;
+
+        /* Cristal: relleno cálido traslúcido, desenfoque y filo de luz. */
+        --glass: rgba(44, 34, 29, 0.46);
+        --glass-thick: rgba(34, 26, 22, 0.72);
+        --glass-blur: blur(28px) saturate(170%);
+        --glass-edge: rgba(255, 255, 255, 0.07);
+        --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+        --radius-s: 10px;
+        --radius-m: 14px;
+        --radius-l: 22px;
+        --radius-xl: 30px;
+
+        --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+        --font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", system-ui, sans-serif;
+
+        /* Muelles de Material 3 Expressive (src/core/spring.ts). El script
+           los sustituye por curvas linear() con la física exacta; estas son
+           las aproximaciones para navegadores que no entienden linear(). */
+        --spatial-fast: cubic-bezier(0.3, 1.6, 0.5, 1);
+        --spatial-fast-ms: 350ms;
+        --spatial-default: cubic-bezier(0.3, 1.35, 0.5, 1);
+        --spatial-default-ms: 500ms;
+        --spatial-slow: cubic-bezier(0.3, 1.25, 0.5, 1);
+        --spatial-slow-ms: 650ms;
+        --effects-fast: cubic-bezier(0.2, 0, 0, 1);
+        --effects-fast-ms: 150ms;
+        --effects-default: cubic-bezier(0.2, 0, 0, 1);
+        --effects-default-ms: 200ms;
+        --effects-slow: cubic-bezier(0.2, 0, 0, 1);
+        --effects-slow-ms: 300ms;
+
+        --glow: var(--neutral);
+        transition: --glow 700ms ease;
+      }
+
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+
+      html { background: var(--background); }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--label);
+        font: 400 17px/22px var(--font);
+        letter-spacing: -0.41px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Fondo: negro cálido con dos resplandores. El de arriba es la marca; el
+         de abajo toma el color del estado de la postura (--glow, que se anima). */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background:
+          radial-gradient(circle at 0% 0%, rgba(255, 122, 41, 0.17), rgba(255, 122, 41, 0) 55%),
+          radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--glow) 24%, transparent), transparent 60%),
+          var(--background);
+      }
+
+      .glass {
+        background: var(--glass);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-edge);
+        box-shadow: var(--glass-highlight), 0 18px 40px rgba(0, 0, 0, 0.28);
+      }
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass { background: var(--glass-thick); }
+      }
+
+      :focus-visible { outline: 3px solid var(--tint); outline-offset: 3px; border-radius: var(--radius-s); }
+
+      .rounded-num { font-family: var(--font-rounded); font-variant-numeric: tabular-nums; }
+
+      /* --------------------------------------------- barra de navegación --- */
+      /* Título grande que, al desplazarse, se recoge en la barra de cristal. */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        min-height: 52px;
+        padding: 8px 20px;
+        border-bottom: 1px solid transparent;
+        transition: background-color 200ms ease, border-color 200ms ease;
+      }
+      .nav.scrolled {
+        background: rgba(20, 15, 12, 0.74);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        border-bottom-color: var(--separator);
+      }
+      .nav-title { grid-column: 2; font: 600 17px/22px var(--font); opacity: 0; transform: translateY(4px); transition: opacity 200ms ease, transform 200ms ease; }
+      .nav.scrolled .nav-title { opacity: 1; transform: none; }
+      .version {
+        grid-column: 3;
+        justify-self: end;
+        font: 600 13px/18px var(--font-rounded);
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--tertiary-fill);
+        color: var(--secondary-label);
+      }
+
+      main { max-width: 1120px; margin: 0 auto; padding: 0 20px 64px; }
+      .large-title { margin: 4px 4px 24px; }
+      .large-title h1 { font: 700 34px/41px var(--font-display); letter-spacing: 0.37px; margin: 0; }
+      .large-title p { color: var(--secondary-label); font-size: 15px; line-height: 20px; letter-spacing: -0.24px; margin: 2px 0 0; }
+
+      /* Dos columnas en pantallas anchas: cámara y resultados a la izquierda,
+         medidor y controles a la derecha. En estrecho, todo en una columna con
+         el medidor justo debajo de la cámara. */
+      .layout {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        grid-template-areas: "camera side" "results side";
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+      .area-camera { grid-area: camera; }
+      .area-side { grid-area: side; }
+      .area-results { grid-area: results; }
+      @media (max-width: 920px) {
+        .layout { grid-template-columns: 1fr; grid-template-areas: "camera" "side" "results"; grid-template-rows: auto; }
+      }
+      .column { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+      .card { border-radius: var(--radius-l); padding: 20px; min-width: 0; }
+      .layout + .settings { margin-top: 32px; }
+      .card-title { font: 600 20px/25px var(--font-display); letter-spacing: 0.38px; margin: 0; }
+      .card-subtitle { color: var(--secondary-label); font-size: 15px; line-height: 20px; letter-spacing: -0.24px; margin: 2px 0 16px; }
+
+      /* ----------------------------------------------------------- cámara --- */
+      .stage { position: relative; border-radius: var(--radius-m); overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+      /* Espejo: te ves como en un espejo, que es lo natural. */
+      .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+      .stage video { object-fit: cover; }
+      .stage-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 24px;
+        text-align: center;
+        background: radial-gradient(circle at 50% 40%, rgba(255, 122, 41, 0.14), transparent 65%), #0d0908;
+      }
+      .stage-empty .lens {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--tertiary-fill);
+        box-shadow: inset 0 0 0 1px var(--glass-edge);
+      }
+      .stage-empty .lens::after { content: ""; width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--tint); }
+      .stage-loader { width: 64px; height: 64px; }
+      .stage-empty b { font: 600 17px/22px var(--font); }
+      .stage-empty span { color: var(--secondary-label); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; max-width: 34ch; }
+      #status { color: var(--secondary-label); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; margin: 12px 4px 0; min-height: 36px; }
+
+      /* ---------------------------------------------------------- medidor --- */
+      .gauge { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--neutral); padding: 8px 0 4px; }
+      .ring-wrap { position: relative; width: 236px; height: 236px; }
+      .ring { width: 100%; height: 100%; overflow: visible; }
+      .ring-track { stroke: currentColor; opacity: 0.2; }
+      /* El tramo recorrido es la onda de Material 3 Expressive; la dibuja el
+         script (web/src/expressive.ts). */
+      #ring-wave { stroke: currentColor; transition: stroke var(--effects-default-ms) var(--effects-default); }
+      #ring-shape { fill: currentColor; opacity: 0.12; }
+      #ring-mark { transform-origin: 118px 118px; transition: transform var(--spatial-default-ms) var(--spatial-default); }
+      .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .ring-loader { width: 60px; height: 60px; overflow: visible; }
+      .stage-loader { overflow: visible; }
+      .ring-loader path, .stage-loader path { fill: var(--tint); }
+      #angle { font: 700 62px/68px var(--font-rounded); font-variant-numeric: tabular-nums; letter-spacing: -0.5px; color: var(--label); }
+      .caption { color: var(--secondary-label); font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
+
+      #phase {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 600 17px/22px var(--font);
+        color: inherit;
+        background: color-mix(in srgb, currentColor 16%, transparent);
+        border-radius: 999px;
+        padding: 8px 18px;
+        transition: color 200ms ease;
+      }
+      #phase::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+      #cause { color: var(--secondary-label); font-size: 15px; line-height: 20px; min-height: 20px; text-align: center; }
+      .hint { color: var(--tertiary-label); font-size: 13px; line-height: 18px; text-align: center; }
+      .grace-row { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+      .grace-row .hint { color: var(--secondary-label); }
+
+      .track { position: relative; width: 100%; height: 6px; border-radius: 999px; background: var(--tertiary-fill); overflow: hidden; }
+      #grace { height: 100%; width: 0; border-radius: 999px; background: var(--yellow); transition: width 140ms linear; }
+
+      /* ---------------------------------------------------------- botones --- */
+      button { font: inherit; }
+      .btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        /* Altura del botón: de ella salen sus esquinas, que cambian de forma
+           al pulsar (Material 3 Expressive) en vez de quedarse en píldora. */
+        --h: 48px;
+        min-height: var(--h);
+        padding: 0 22px;
+        border: 0;
+        border-radius: calc(var(--h) / 2);
+        font: 600 17px/22px var(--font);
+        letter-spacing: -0.41px;
+        color: var(--label);
+        background: transparent;
+        cursor: pointer;
+        user-select: none;
+        transition:
+          transform var(--spatial-fast-ms) var(--spatial-fast),
+          border-radius var(--spatial-default-ms) var(--spatial-default),
+          flex-grow var(--spatial-default-ms) var(--spatial-default),
+          filter var(--effects-fast-ms) var(--effects-fast),
+          background-color var(--effects-default-ms) var(--effects-default),
+          color var(--effects-default-ms) var(--effects-default),
+          box-shadow var(--effects-default-ms) var(--effects-default);
+      }
+      .btn:hover:not(:disabled) { filter: brightness(1.1); }
+      .btn:active:not(:disabled) { transform: scale(0.96); border-radius: calc(var(--h) * 0.32); }
+      .btn:disabled { opacity: 0.4; cursor: default; }
+      .btn-glass {
+        background: var(--glass);
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-edge);
+        box-shadow: var(--glass-highlight);
+      }
+      .btn-prominent { background: var(--tint); color: var(--on-tint); }
+      .btn-large { --h: 56px; box-shadow: 0 12px 30px rgba(255, 122, 41, 0.35); }
+      /* Seleccionado (vigilando), el botón principal deja de ser píldora. */
+      #start.stop {
+        background: var(--red);
+        color: var(--on-status);
+        border-radius: calc(var(--h) * 0.3);
+        box-shadow: 0 12px 30px rgba(255, 69, 58, 0.35);
+      }
+      #start.stop:active:not(:disabled) { border-radius: calc(var(--h) * 0.2); }
+      .btn-plain { color: var(--tint); padding: 0 8px; }
+      .btn-destructive { color: var(--red); }
+      .btn-small { --h: 34px; padding: 0 16px; font-size: 15px; letter-spacing: -0.24px; }
+      kbd {
+        font: 600 11px/1 var(--font-rounded);
+        padding: 3px 6px;
+        border-radius: 6px;
+        background: color-mix(in srgb, currentColor 14%, transparent);
+        opacity: 0.8;
+      }
+
+      .actions { display: flex; flex-direction: column; gap: 12px; }
+      .row-buttons { display: flex; gap: 12px; }
+      .row-buttons .btn { flex: 1; }
+
+      /* Grupo de botones conectado de Material 3 Expressive: pegados, con las
+         esquinas de dentro casi rectas. El pulsado se ensancha empujando al
+         vecino y redondea sus esquinas interiores. */
+      .button-group { display: flex; gap: 3px; }
+      .button-group .btn { flex: 1 1 0; min-width: 0; border-radius: 10px; }
+      .button-group .btn:first-child { border-top-left-radius: calc(var(--h) / 2); border-bottom-left-radius: calc(var(--h) / 2); }
+      .button-group .btn:last-child { border-top-right-radius: calc(var(--h) / 2); border-bottom-right-radius: calc(var(--h) / 2); }
+      .button-group .btn:active:not(:disabled) { flex-grow: 1.18; transform: none; border-radius: calc(var(--h) * 0.36); }
+
+      /* ------------------------------------------------------- estadística --- */
+      .stats { display: flex; border-radius: var(--radius-l); padding: 16px 0; }
+      .stat { flex: 1; text-align: center; padding: 0 8px; min-width: 0; }
+      .stat + .stat { border-left: 1px solid var(--separator); }
+      .stat b { display: block; font: 700 22px/28px var(--font-rounded); font-variant-numeric: tabular-nums; letter-spacing: 0.35px; white-space: nowrap; }
+      .stat span { color: var(--secondary-label); font-size: 13px; line-height: 18px; }
+
+      /* ------------------------------------------------------------ avisos --- */
+      .notice {
+        --tone: var(--yellow);
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 4px 12px;
+        margin-top: 16px;
+        padding: 16px;
+        border-radius: var(--radius-l);
+        background: color-mix(in srgb, var(--tone) 12%, var(--glass));
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-edge);
+        box-shadow: var(--glass-highlight);
+      }
+      .notice.grave { --tone: var(--red); }
+      .notice::before {
+        content: "!";
+        grid-row: span 2;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--tone);
+        color: var(--on-status);
+        font: 800 17px/1 var(--font);
+      }
+      .notice b { font: 600 17px/22px var(--font); }
+      .notice span { color: var(--secondary-label); font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
+      .notice-actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+      .notice-actions .btn-prominent { background: var(--tone); color: var(--on-status); }
+
+      /* -------------------------------------------------- listas agrupadas --- */
+      /* Como la app Ajustes de iOS: cabecera en versalitas, filas dentro de un
+         mismo cristal con separadores sangrados y una nota al pie. */
+      .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 20px; align-items: start; }
+      @media (max-width: 920px) { .settings { grid-template-columns: 1fr; } }
+      .settings-column { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+      .group-header { font: 400 13px/18px var(--font); letter-spacing: -0.08px; text-transform: uppercase; color: var(--secondary-label); margin: 0 16px 6px; }
+      .group-footer { color: var(--secondary-label); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; margin: 6px 16px 0; }
+      .group-body { border-radius: var(--radius-m); overflow: hidden; }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 48px;
+        padding: 10px 16px;
+      }
+      .row + .row {
+        background-image: linear-gradient(var(--separator), var(--separator));
+        background-size: calc(100% - 16px) 1px;
+        background-position: right top;
+        background-repeat: no-repeat;
+      }
+      .row label, .row .row-text { flex: 1; min-width: 0; cursor: pointer; }
+      .row small { display: block; color: var(--secondary-label); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; margin-top: 1px; }
+      .row output { color: var(--secondary-label); font: 400 17px/22px var(--font-rounded); font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+      .row .accessory { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+      .row.center { justify-content: center; }
+
+      /* Deslizador de iOS: pista fina con el tramo recorrido en el acento y un
+         pulgar blanco grande con sombra. --fill lo pone el script. */
+      input[type="range"] {
+        --fill: 50%;
+        width: 170px;
+        height: 28px;
+        margin: 0;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 999px;
+        background: linear-gradient(to right, var(--tint) var(--fill), var(--fill-track, rgba(130, 120, 118, 0.36)) var(--fill));
+      }
+      input[type="range"]::-moz-range-track { height: 4px; border-radius: 999px; background: var(--fill); }
+      input[type="range"]::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--tint); }
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        margin-top: -12px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.16);
+        transition: transform 200ms var(--spatial-default);
+      }
+      input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
+      input[type="range"]::-moz-range-thumb { width: 28px; height: 28px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
+
+      /* Interruptor de iOS: pista de 51×31 y pulgar blanco que se desliza. */
+      .switch {
+        appearance: none;
+        flex: 0 0 auto;
+        position: relative;
+        width: 51px;
+        height: 31px;
+        margin: 0;
+        border-radius: 999px;
+        background: var(--fill);
+        cursor: pointer;
+        transition: background-color 220ms ease;
+      }
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 27px;
+        height: 27px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25), 0 1px 1px rgba(0, 0, 0, 0.16);
+        transition: transform 300ms var(--spatial-default);
+      }
+      .switch:checked { background: var(--tint); }
+      .switch:checked::after { transform: translateX(20px); }
+      .switch:focus-visible { outline-offset: 2px; border-radius: 999px; }
+
+      /* Control segmentado de iOS a partir de botones de radio. */
+      .segmented { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--tertiary-fill); }
+      .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+      .segmented label {
+        padding: 6px 14px;
+        border-radius: 7px;
+        font: 600 13px/18px var(--font);
+        letter-spacing: -0.08px;
+        color: var(--secondary-label);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+      }
+      .segmented input:checked + label { background: #6b605b; color: var(--label); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); }
+      .segmented input:focus-visible + label { outline: 3px solid var(--tint); outline-offset: 1px; }
+      .segmented-wide { display: flex; width: 100%; }
+      .segmented-wide label { flex: 1; text-align: center; }
+
+      /* -------------------------------------------------------- resultados --- */
+      .comparativa-fila { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+      .comparativa-fila .cabecera { display: flex; justify-content: space-between; align-items: baseline; }
+      .comparativa-fila .etiqueta { font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
+      .comparativa-fila output { font: 600 17px/22px var(--font-rounded); font-variant-numeric: tabular-nums; }
+      #valor-control { color: var(--yellow); }
+      #valor-avisos { color: var(--green); }
+      .comparativa-fila .barra { height: 10px; background: var(--tertiary-fill); border-radius: 999px; overflow: hidden; }
+      .comparativa-fila .barra i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width 400ms var(--spatial-default); }
+      #barra-control { background: var(--yellow); }
+      #barra-avisos { background: var(--green); }
+      #conclusion { font-size: 16px; line-height: 21px; letter-spacing: -0.32px; margin: 4px 0 0; }
+      #historial-vacio { color: var(--secondary-label); font-size: 15px; line-height: 20px; margin: 0; }
+
+      /* Una columna por sesión; dentro, la barra crece desde abajo. */
+      .sesiones { display: flex; align-items: stretch; gap: 5px; height: 96px; margin-top: 20px; }
+      .sesiones:empty { height: 0; margin-top: 0; }
+      .sesiones .sesion { flex: 1; max-width: 24px; background: var(--quaternary-fill); border-radius: 999px; display: flex; align-items: flex-end; overflow: hidden; }
+      .sesiones .sesion i { display: block; width: 100%; border-radius: 999px; min-height: 6px; }
+      .sesiones .sesion.control i { background: var(--yellow); }
+      .sesiones .sesion.avisos i { background: var(--green); }
+      .leyenda { display: flex; flex-wrap: wrap; gap: 16px; color: var(--secondary-label); font-size: 13px; line-height: 18px; margin-top: 12px; }
+      .leyenda span { display: flex; align-items: center; gap: 6px; }
+      .leyenda b { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+      .history-actions { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+
+      footer { color: var(--tertiary-label); font-size: 13px; line-height: 18px; margin: 32px 4px 0; text-align: center; }
+      footer p { margin: 4px 0; }
+
+      /* ------------------------------------------------- alerta a pantalla --- */
+      .alert {
+        position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 16px; text-align: center; padding: 32px; z-index: 10; pointer-events: none;
+      }
+      .alert.hidden { display: none; }
+      /* La única parte sin cristal: dos colores opacos que se alternan, para
+         tapar la pantalla entera y que el destello se vea a metros. */
+      .alert.countdown { background: var(--tint); color: var(--on-tint); animation: flash-cuenta 0.76s infinite; }
+      .alert.countdown #alert-text { font: 700 25vh/1 var(--font-rounded); font-variant-numeric: tabular-nums; }
+      .alert.alarm { background: var(--red); color: #1a0503; animation: flash-alarma 0.76s infinite; }
+      .alert.alarm #alert-text { font: 800 clamp(40px, 8vw, 88px)/1.05 var(--font-display); letter-spacing: 0.5px; }
+      #alert-body { font: 600 20px/26px var(--font); max-width: 32ch; }
+      #alert-text, #alert-body { position: relative; }
+      /* Detrás del texto, la forma de estallido de Material 3 Expressive. */
+      .alert-shape { position: absolute; width: min(70vmin, 420px); height: min(70vmin, 420px); overflow: visible; }
+      .alert-shape path { fill: currentColor; opacity: 0.1; }
+      @keyframes flash-alarma { 0%, 100% { background-color: var(--red); } 50% { background-color: #ffe3e0; } }
+      @keyframes flash-cuenta { 0%, 100% { background-color: var(--tint); } 50% { background-color: #ffd9c2; } }
+
+      /* ------------------------------------------------------ movimiento --- */
+      /* Entrada escalonada con el muelle espacial lento: cada bloque sube un
+         poco y aparece, uno detrás de otro (--i es su turno). */
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(22px) scale(0.97); }
+        to { opacity: 1; transform: none; }
+      }
+      .appear { animation: rise var(--spatial-slow-ms) var(--spatial-slow) both; animation-delay: calc(var(--i, 0) * 70ms); }
+      /* Rebote del estado cada vez que cambia. */
+      @keyframes pop { from { transform: scale(0.86); } to { transform: scale(1); } }
+      #phase.pop { animation: pop var(--spatial-fast-ms) var(--spatial-fast); }
+
+      /* Quien pide menos movimiento se queda con el color, sin parpadeo. */
+      @media (prefers-reduced-motion: reduce) {
+        .alert { animation: none !important; }
+        .appear, #phase.pop { animation: none !important; }
+        *, *::before, *::after { transition-duration: 1ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav" id="nav">
+      <span class="nav-title" aria-hidden="true">PostureFix</span>
+      <span id="version" class="version"></span>
+    </header>
+
+    <main>
+      <div class="large-title appear" id="large-title" style="--i: 0">
+        <h1>PostureFix</h1>
+        <p>Versión para portátil: la webcam te vigila la espalda.</p>
+      </div>
+
+      <div class="layout">
+        <section class="card glass area-camera appear" style="--i: 1">
+          <div class="stage">
+            <video id="video" playsinline muted></video>
+            <canvas id="overlay"></canvas>
+            <div id="stage-empty" class="stage-empty">
+              <div class="lens" id="stage-lens" aria-hidden="true"></div>
+              <svg class="stage-loader" id="stage-loader" viewBox="0 0 64 64" aria-hidden="true" hidden><path id="stage-loader-path" /></svg>
+              <b id="stage-title">La cámara se enciende al calibrar</b>
+              <span id="stage-text">Colócate de frente, con los hombros y las orejas a la vista. El vídeo se procesa aquí y no sale de este equipo.</span>
+            </div>
+          </div>
+          <p id="status" role="status" aria-live="polite"></p>
+
+          <div id="aviso" class="notice" hidden role="alert">
+            <b id="aviso-titulo"></b>
+            <span id="aviso-texto"></span>
+            <span class="notice-actions">
+              <button id="aviso-recalibrar" type="button" class="btn btn-prominent btn-small">Recalibrar</button>
+              <button id="aviso-descartar" type="button" class="btn btn-glass btn-small">Descartar</button>
+            </span>
+          </div>
+        </section>
+
+        <div class="column area-side">
+          <section class="card glass appear" style="--i: 2">
+            <div class="gauge" id="gauge">
+              <div class="ring-wrap">
+                <svg class="ring" viewBox="0 0 236 236" aria-hidden="true">
+                  <path id="ring-shape" />
+                  <circle class="ring-track" cx="118" cy="118" r="103.3" fill="none" stroke-width="16" />
+                  <path id="ring-wave" fill="none" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+                  <g id="ring-mark"><rect x="116.5" y="1.7" width="3" height="26" rx="1.5" fill="#fff" /></g>
+                </svg>
+                <div class="ring-center">
+                  <svg class="ring-loader" id="ring-loader" viewBox="0 0 60 60" hidden><path id="ring-loader-path" /></svg>
+                  <div id="angle" aria-live="off">0°</div>
+                  <div class="caption" id="angle-caption">de inclinación</div>
+                </div>
+              </div>
+              <div id="phase" role="status" aria-live="polite">En pausa</div>
+              <div id="cause"></div>
+              <div id="grace-row" class="grace-row" hidden>
+                <div id="grace-text" class="hint"></div>
+                <div class="track"><div id="grace"></div></div>
+              </div>
+              <div id="threshold-hint" class="hint"></div>
+            </div>
+          </section>
+
+          <div class="actions appear" style="--i: 3">
+            <button id="start" type="button" class="btn btn-prominent btn-large" aria-keyshortcuts="Space" aria-pressed="false">
+              Empezar a vigilar
+            </button>
+            <div class="button-group" role="group" aria-label="Calibración y prueba">
+              <button id="calibrate" type="button" class="btn btn-glass" aria-keyshortcuts="C">Calibrar</button>
+              <button id="test" type="button" class="btn btn-glass" aria-keyshortcuts="P">Probar alerta</button>
+            </div>
+          </div>
+
+          <div class="stats glass appear" style="--i: 4">
+            <div class="stat"><b id="stat-alerts">0</b><span>alertas</span></div>
+            <div class="stat"><b id="stat-bad">0s</b><span>encorvado</span></div>
+            <div class="stat"><b id="stat-session">0s</b><span>sesión</span></div>
+          </div>
+
+          <div class="appear" style="--i: 5">
+            <div class="group-body glass">
+              <div class="row">
+                <label for="set-control">
+                  Sesión de control
+                  <small>Mide y registra sin avisar. Es el grupo de comparación del experimento.</small>
+                </label>
+                <input type="checkbox" class="switch" id="set-control" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="card glass area-results appear" id="historial" style="--i: 3">
+          <h2 class="card-title">Resultados</h2>
+          <p class="card-subtitle">Tiempo que pasas encorvado, con avisos y sin ellos</p>
+          <p id="historial-vacio">
+            Aún no hay sesiones guardadas. Haz una <b>sesión de control</b> y otra normal de al menos medio minuto cada
+            una, y aquí aparecerá la comparación.
+          </p>
+
+          <div id="comparativa" hidden>
+            <div class="comparativa-fila">
+              <span class="cabecera"><span class="etiqueta">Sin avisos (control)</span><output id="valor-control"></output></span>
+              <span class="barra"><i id="barra-control"></i></span>
+            </div>
+            <div class="comparativa-fila">
+              <span class="cabecera"><span class="etiqueta">Con avisos</span><output id="valor-avisos"></output></span>
+              <span class="barra"><i id="barra-avisos"></i></span>
+            </div>
+            <p id="conclusion"></p>
+          </div>
+
+          <div id="sesiones" class="sesiones"></div>
+          <div class="leyenda" id="leyenda" hidden>
+            <span><b style="background: #ffd60a"></b> control (sin avisos)</span>
+            <span><b style="background: #30d158"></b> con avisos</span>
+            <span>altura = % del tiempo encorvado</span>
+          </div>
+
+          <div class="history-actions">
+            <button id="csv" type="button" class="btn btn-glass btn-small">Descargar CSV</button>
+            <button id="borrar" type="button" class="btn btn-plain btn-destructive btn-small">Borrar historial</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="settings">
+        <div class="settings-column appear" style="--i: 6">
+          <div>
+            <h3 class="group-header">Sensibilidad</h3>
+            <div class="group-body glass">
+              <div class="row">
+                <label for="set-threshold">Umbral de mala postura</label>
+                <span class="accessory"><output id="val-threshold"></output><input type="range" id="set-threshold" min="10" max="55" step="1" /></span>
+              </div>
+              <div class="row">
+                <label for="set-grace">Margen antes del pitido</label>
+                <span class="accessory"><output id="val-grace"></output><input type="range" id="set-grace" min="1" max="20" step="1" /></span>
+              </div>
+            </div>
+            <p class="group-footer">
+              El umbral es cuánto te puedes desviar de la postura calibrada; el margen, cuánto aguantas así antes del susto.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="group-header">Detector</h3>
+            <div class="group-body glass">
+              <div class="row">
+                <span class="row-text">Precisión</span>
+                <span class="segmented" id="set-modelo" role="radiogroup" aria-label="Precisión del detector">
+                  <input type="radio" name="modelo" id="modelo-full" value="full" /><label for="modelo-full">Alta · 9,4 MB</label>
+                  <input type="radio" name="modelo" id="modelo-lite" value="lite" /><label for="modelo-lite">Ligera · 5,8 MB</label>
+                </span>
+              </div>
+              <div class="row">
+                <label for="set-fps">Análisis por segundo</label>
+                <span class="accessory"><output id="val-fps"></output><input type="range" id="set-fps" min="5" max="30" step="1" /></span>
+              </div>
+              <div class="row">
+                <label for="set-feria">
+                  Modo feria
+                  <small>Tiempos cortos para el stand: la secuencia entera en unos 5 s.</small>
+                </label>
+                <input type="checkbox" class="switch" id="set-feria" />
+              </div>
+            </div>
+            <p class="group-footer">
+              El modelo grande sitúa mejor los puntos; el ligero y menos fotogramas por segundo dejan respirar a los equipos justos.
+            </p>
+          </div>
+        </div>
+
+        <div class="settings-column appear" style="--i: 7">
+          <div>
+            <h3 class="group-header">Hasta dónde avisa</h3>
+            <div class="group-body glass">
+              <div class="row">
+                <span class="segmented segmented-wide" id="set-nivel" role="radiogroup" aria-label="Hasta dónde avisa">
+                  <input type="radio" name="nivel" id="nivel-beep" value="beep" /><label for="nivel-beep">Pitido</label>
+                  <input type="radio" name="nivel" id="nivel-count" value="count" /><label for="nivel-count">Cuenta</label>
+                  <input type="radio" name="nivel" id="nivel-alarm" value="alarm" /><label for="nivel-alarm">Alarma</label>
+                </span>
+              </div>
+            </div>
+            <p class="group-footer" id="nivel-nota"></p>
+          </div>
+
+          <div>
+            <h3 class="group-header">Sonido y avisos</h3>
+            <div class="group-body glass">
+              <div class="row">
+                <label for="set-volume">Volumen</label>
+                <span class="accessory"><output id="val-volume"></output><input type="range" id="set-volume" min="0" max="1" step="0.05" /></span>
+              </div>
+              <div class="row">
+                <label for="set-headphones">Llevo auriculares<small>El navegador no puede detectarlos solo.</small></label>
+                <input type="checkbox" class="switch" id="set-headphones" />
+              </div>
+              <div class="row">
+                <label for="set-eas">Tono EAS siempre<small>También por los altavoces del portátil.</small></label>
+                <input type="checkbox" class="switch" id="set-eas" />
+              </div>
+              <div class="row">
+                <label for="set-voice">Voz: uno, dos, tres</label>
+                <input type="checkbox" class="switch" id="set-voice" />
+              </div>
+              <div class="row">
+                <label for="set-notify">Notificación del sistema<small>Salta aunque estés en otra pestaña.</small></label>
+                <input type="checkbox" class="switch" id="set-notify" />
+              </div>
+            </div>
+            <p class="group-footer">
+              Con auriculares suena el tono de emergencia EAS (853 + 960 Hz); por los altavoces, una sirena de dos tonos.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p>Atajos: <kbd>Espacio</kbd> empezar o parar · <kbd>C</kbd> calibrar · <kbd>P</kbd> probar la alerta</p>
+        <p>
+          Todo el procesamiento ocurre en tu navegador: el vídeo no se graba ni se envía a ningún sitio. Si minimizas la
+          ventana, el navegador ralentiza el análisis a ~1 fps, pero las alertas siguen sonando.
+        </p>
+      </footer>
+    </main>
+
+    <div id="alert-overlay" class="alert hidden" aria-live="assertive">
+      <svg class="alert-shape" viewBox="0 0 340 340" aria-hidden="true"><path id="alert-shape" /></svg>
+      <div id="alert-text"></div>
+      <div id="alert-body"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

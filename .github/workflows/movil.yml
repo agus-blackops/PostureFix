@@ -1,0 +1,138 @@
+# Construye la app de móvil para Android (un APK que se instala directamente)
+# en los runners de GitHub. El APK queda como artefacto de cada ejecución y,
+# al etiquetar una versión, se cuelga del Release junto a los de escritorio.
+name: App de móvil
+
+on:
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: >-
+          Etiqueta ya existente a la que subir el APK (p. ej. v2.0.0).
+          Vacío: solo construir.
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'App.tsx'
+      - 'index.ts'
+      - 'src/**'
+      - 'modules/**'
+      - 'assets/**'
+      - 'app.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/movil.yml'
+  push:
+    tags: ['v*', 'V*']
+
+jobs:
+  android:
+    name: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Clave pública de RevenueCat para Labs; si no está, Labs funciona con
+      # la prueba gratis y la suscripción sale como no disponible.
+      EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: ${{ secrets.REVENUECAT_ANDROID_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobaciones
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Generar el proyecto nativo
+        run: |
+          npx expo prebuild --platform android --no-install
+          # Las builds de React Native piden más memoria que la que trae la
+          # plantilla. Se cambia la línea en su sitio: el archivo no acaba en
+          # salto de línea y añadirla al final la pegaría a la última.
+          MEMORIA='org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8'
+          if grep -q '^org\.gradle\.jvmargs=' android/gradle.properties; then
+            sed -i "s/^org\.gradle\.jvmargs=.*/$MEMORIA/" android/gradle.properties
+          else
+            printf '\n%s\n' "$MEMORIA" >> android/gradle.properties
+          fi
+          grep -n 'jvmargs\|watchedDirectories' android/gradle.properties
+
+      - name: Compilar el APK
+        working-directory: android
+        # Las dos arquitecturas de los móviles reales (las x86 son de emuladores).
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
+      - name: Ponerle nombre
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p salida
+          cp android/app/build/outputs/apk/release/app-release.apk "salida/PostureFix-$VERSION.apk"
+          ls -lh salida
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: posturefix-android
+          path: salida/*.apk
+          if-no-files-found: error
+
+  publicar:
+    name: Publicar el APK
+    needs: android
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      startsWith(github.ref, 'refs/tags/V') ||
+      github.event.inputs.etiqueta != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: posturefix-android
+          path: apk
+
+      - name: Sacar las notas del CHANGELOG
+        env:
+          ETIQUETA: ${{ github.event.inputs.etiqueta || github.ref_name }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const version = process.env.ETIQUETA.replace(/^v/i, '');
+            const seccion = fs.readFileSync('CHANGELOG.md', 'utf8')
+              .split(/^## /m)
+              .find((bloque) => bloque.trimStart().startsWith(version));
+            fs.writeFileSync('notas.md', seccion ? '## ' + seccion.trim() : 'Sin notas para ' + version + '.');
+          "
+
+      - name: Subir el APK al Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETIQUETA: ${{ github.event.inputs.etiqueta || github.ref_name }}
+        # El workflow de escritorio puede haber creado ya el Release (suele
+        # acabar antes); si los dos llegan a la vez, el segundo sube y listo.
+        run: |
+          if gh release view "$ETIQUETA" >/dev/null 2>&1; then
+            gh release upload "$ETIQUETA" apk/*.apk --clobber
+          else
+            gh release create "$ETIQUETA" --title "PostureFix $ETIQUETA" --notes-file notas.md apk/*.apk \
+              || { sleep 20; gh release upload "$ETIQUETA" apk/*.apk --clobber; }
+          fi

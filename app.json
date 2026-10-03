@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "PostureFix",
+    "slug": "posturefix",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "posturefix",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0A0706",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0706"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.posturefix.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "NSMotionUsageDescription": "PostureFix usa los sensores de movimiento (acelerómetro y giroscopio) para saber cuándo te encorvas y avisarte."
+      },
+      "buildNumber": "200"
+    },
+    "android": {
+      "package": "com.posturefix.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0706",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 200
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#FF7A29"
+        }
+      ]
+    ]
+  }
+}
