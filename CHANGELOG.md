@@ -30,6 +30,13 @@ publicada en internet con su QR, y arreglos. Lo que se mide no cambia.
   app dice qué versión es cada una y deja elegir con cuál seguir, en vez de
   mostrar la vieja sin más. Funciona a partir de que la abierta sea la 2.1.
 - Escritorio: la versión aparece en el icono de la bandeja y en su menú.
+- Portátil: cuando la cámara no se abre, la app dice por qué y qué tocar en
+  vez de enseñar el error en inglés. Con «Permission denied by system» explica
+  dónde se desbloquea en Windows (Privacidad y seguridad → Cámara, también para
+  las aplicaciones de escritorio), recuerda la tecla de la cámara de los
+  portátiles ASUS y ofrece los botones «Abrir ajustes de la cámara» y «Probar
+  otra vez». También distingue el permiso denegado en el navegador, la cámara
+  ocupada por otra aplicación y la falta de cámara.
 
 ## 2.0.0
 

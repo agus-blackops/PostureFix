@@ -301,6 +301,8 @@
       #start.stop:active:not(:disabled) { border-radius: calc(var(--h) * 0.2); }
       .btn-plain { color: var(--tint); padding: 0 8px; }
       .btn-destructive { color: var(--red); }
+      .stage-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+      .stage-actions:not(:has(button:not([hidden]))) { display: none; }
       .btn-small { --h: 34px; padding: 0 16px; font-size: 15px; letter-spacing: -0.24px; }
       kbd {
         font: 600 11px/1 var(--font-rounded);
@@ -561,6 +563,10 @@
               <svg class="stage-loader" id="stage-loader" viewBox="0 0 64 64" aria-hidden="true" hidden><path id="stage-loader-path" /></svg>
               <b id="stage-title">La cámara se enciende al calibrar</b>
               <span id="stage-text">Colócate de frente, con los hombros y las orejas a la vista. El vídeo se procesa aquí y no sale de este equipo.</span>
+              <span class="stage-actions">
+                <button id="stage-settings" type="button" class="btn btn-prominent btn-small" hidden>Abrir ajustes de la cámara</button>
+                <button id="stage-retry" type="button" class="btn btn-glass btn-small" hidden>Probar otra vez</button>
+              </span>
             </div>
           </div>
           <p id="status" role="status" aria-live="polite"></p>

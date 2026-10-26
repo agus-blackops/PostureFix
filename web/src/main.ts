@@ -35,6 +35,7 @@ import { expressionFor } from '../../src/core/expression';
 import { formatDegrees, formatDuration, formatPercent } from '../../src/core/format';
 import { SHAPES } from '../../src/core/shapes';
 import { WebAlerts } from './alerts';
+import { cameraErrorHelp } from './cameraError';
 import { LoadingIndicator, MorphingShape, WavyRing, installMotionTokens } from './expressive';
 import { createPoseLandmarker, startCamera, stopCamera, type ModelQuality } from './detector';
 import {
@@ -131,6 +132,8 @@ const ui = {
   stageLoaderPath: el('stage-loader-path') as unknown as SVGPathElement,
   stageTitle: el('stage-title'),
   stageText: el('stage-text'),
+  stageSettings: el<HTMLButtonElement>('stage-settings'),
+  stageRetry: el<HTMLButtonElement>('stage-retry'),
   alertShape: el('alert-shape') as unknown as SVGPathElement,
   grace: el('grace'),
   graceRow: el('grace-row'),
@@ -629,10 +632,27 @@ function ensureDetector(): Promise<boolean> {
   return detectorStarting;
 }
 
+/** Ajustes del sistema que arreglan el último error de cámara, si los hay. */
+let stageSettingsUrl: string | null = null;
+
+/**
+ * Abre los ajustes del sistema. En la app de escritorio, `window.open` pasa por
+ * Electron, que se lo da al sistema; en el navegador basta con navegar al
+ * enlace: el navegador pregunta y abre Configuración sin salir de la página.
+ */
+function openCameraSettings(): void {
+  if (!stageSettingsUrl) return;
+  if (/Electron/.test(navigator.userAgent)) window.open(stageSettingsUrl, '_blank');
+  else window.location.href = stageSettingsUrl;
+}
+
 /** Mensaje del recuadro de la cámara mientras está apagada. */
-function setStage(title: string, text: string, loading: boolean): void {
+function setStage(title: string, text: string, loading: boolean, settingsUrl: string | null = null, retry = false): void {
   ui.stageTitle.textContent = title;
   ui.stageText.textContent = text;
+  stageSettingsUrl = settingsUrl;
+  ui.stageSettings.hidden = settingsUrl == null;
+  ui.stageRetry.hidden = !retry;
   ui.stageLens.hidden = loading;
   // En SVG, `hidden` no es una propiedad: hay que tocar el atributo.
   ui.stageLoader.toggleAttribute('hidden', !loading);
@@ -658,13 +678,9 @@ async function startDetector(): Promise<boolean> {
     setStatus('Cámara lista. El vídeo no sale de este equipo.');
     return true;
   } catch (error) {
-    const message = (error as Error).message;
-    setStage(
-      'No se pudo abrir la cámara',
-      `${message}. Revisa el permiso de cámara del navegador o si otra aplicación la está usando, y pulsa «Calibrar» otra vez.`,
-      false
-    );
-    setStatus(`No se pudo abrir la cámara: ${message}`);
+    const help = cameraErrorHelp(error as { name?: string; message?: string }, navigator.userAgent);
+    setStage(help.title, help.text, false, help.settingsUrl, true);
+    setStatus(`${help.title} (${(error as Error)?.message ?? 'sin detalles'})`);
     return false;
   }
 }
@@ -936,6 +952,8 @@ function bindInputs(): void {
   }
   ui.fairMode.addEventListener('change', toggleFairMode);
   ui.noticeRecalibrate.addEventListener('click', () => void calibrate());
+  ui.stageSettings.addEventListener('click', openCameraSettings);
+  ui.stageRetry.addEventListener('click', () => void calibrate());
   ui.noticeDismiss.addEventListener('click', () => {
     reposition = clearReposition(reposition);
     renderNotice();
