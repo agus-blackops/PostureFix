@@ -385,9 +385,13 @@ scripts/generate-assets.mjs  generador de sonidos e iconos
 web/                         versión para portátil: webcam + MediaPipe Pose
 web/src/postureVision.ts     medición de postura por webcam (con tests)
 web/src/expressive.ts        anillo, formas y muelles de la versión de portátil
+web/src/detector.ts          carga de MediaPipe: GPU y, si falla, CPU
+web/src/cameraPlan.ts        qué cámara probar primero (descarta las infrarrojas) y cuáles quedan
+web/src/cameraError.ts       mensajes de ayuda cuando la cámara no abre (con tests)
 web/build.mjs                empaquetado con esbuild
 desktop/main.js              envoltorio de escritorio (Electron)
 docs/panel-feria.html        panel explicativo para el stand
+docs/trailer/                tráilers en vídeo y el código para regenerarlos (ver su README)
 .github/workflows/           construcción de los ejecutables y del APK
 ```
 
