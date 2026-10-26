@@ -36,8 +36,9 @@ import { formatDegrees, formatDuration, formatPercent } from '../../src/core/for
 import { SHAPES } from '../../src/core/shapes';
 import { WebAlerts } from './alerts';
 import { cameraErrorHelp } from './cameraError';
+import { cameraLabel, isInfraredCamera, type CameraInfo } from './cameraPlan';
 import { LoadingIndicator, MorphingShape, WavyRing, installMotionTokens } from './expressive';
-import { createPoseLandmarker, startCamera, stopCamera, type ModelQuality } from './detector';
+import { createPoseLandmarker, listCameras, startCamera, stopCamera, type ModelQuality } from './detector';
 import {
   CAUSE_LABEL,
   METRIC_KEYS,
@@ -133,6 +134,8 @@ const ui = {
   stageTitle: el('stage-title'),
   stageText: el('stage-text'),
   stageSettings: el<HTMLButtonElement>('stage-settings'),
+  cameraSelect: el<HTMLSelectElement>('set-camera'),
+  cameraHint: el('camera-hint'),
   stageRetry: el<HTMLButtonElement>('stage-retry'),
   alertShape: el('alert-shape') as unknown as SVGPathElement,
   grace: el('grace'),
@@ -625,11 +628,84 @@ function downloadCsv(): void {
 let detectorStarting: Promise<boolean> | null = null;
 
 function ensureDetector(): Promise<boolean> {
-  if (landmarker) return Promise.resolve(true);
+  // Hace falta el detector y además la cámara: tras un cambio de cámara
+  // fallido puede haber lo primero sin lo segundo.
+  if (landmarker && ui.video.srcObject) return Promise.resolve(true);
   detectorStarting ??= startDetector().finally(() => {
     detectorStarting = null;
   });
   return detectorStarting;
+}
+
+/** La cámara abierta ahora mismo, o `null`. */
+let openedCamera: CameraInfo | null = null;
+
+/**
+ * Rellena el selector de cámaras. Hasta que hay permiso el navegador no da los
+ * nombres, así que la lista buena sale al encender la cámara la primera vez.
+ */
+async function refreshCameraList(): Promise<CameraInfo[] | null> {
+  let cameras: CameraInfo[];
+  try {
+    cameras = await listCameras();
+  } catch {
+    return null;
+  }
+  const select = ui.cameraSelect;
+  select.replaceChildren(new Option('Automática', ''));
+  cameras.forEach((camera, index) => {
+    if (camera.deviceId) select.add(new Option(cameraLabel(camera, index), camera.deviceId));
+  });
+  // Una elegida que ya no está conectada sigue en la lista, para no perderla.
+  if (settings.cameraId && !cameras.some((camera) => camera.deviceId === settings.cameraId)) {
+    select.add(new Option('Elegida (no conectada)', settings.cameraId));
+  }
+  select.value = settings.cameraId ?? '';
+
+  if (cameras.length === 0) {
+    ui.cameraHint.textContent = 'El sistema no ve ninguna cámara.';
+  } else if (openedCamera) {
+    const current = openedCamera;
+    const name = cameraLabel(current, Math.max(0, cameras.findIndex((c) => c.deviceId === current.deviceId)));
+    ui.cameraHint.textContent = isInfraredCamera(current.label)
+      ? `Usando ${name}: es la de reconocer la cara y puede no verte bien. Elige otra si la hay.`
+      : `Usando ${name}.`;
+  } else {
+    ui.cameraHint.textContent =
+      cameras.length === 1 ? 'Hay 1 cámara.' : `Hay ${cameras.length} cámaras. Los nombres salen al encenderla.`;
+  }
+  return cameras;
+}
+
+/** Cambia de cámara sin parar la vigilancia ni recargar el detector. */
+async function switchCamera(): Promise<void> {
+  if (!ui.video.srcObject) {
+    void refreshCameraList();
+    return;
+  }
+  setStatus('Cambiando de cámara…');
+  stopCamera(ui.video);
+  ui.stageEmpty.hidden = false;
+  setStage('Cambiando de cámara…', 'Un momento.', true);
+  try {
+    const opened = await startCamera(ui.video, settings.cameraId);
+    openedCamera = { deviceId: opened.deviceId ?? '', label: opened.label };
+    ui.stageEmpty.hidden = true;
+    stageLoader.stop();
+    const name = opened.label ? cameraLabel({ deviceId: '', label: opened.label }, 0) : 'otra cámara';
+    setStatus(
+      settings.cameraId && opened.deviceId !== settings.cameraId
+        ? `La cámara elegida no arranca; sigo con ${name}. Conviene recalibrar.`
+        : `Cámara cambiada: ${name}. Conviene recalibrar.`
+    );
+  } catch (error) {
+    openedCamera = null;
+    const cameras = await refreshCameraList();
+    const help = cameraErrorHelp(error as { name?: string; message?: string }, navigator.userAgent, cameras?.length ?? null);
+    setStage(help.title, help.text, false, help.settingsUrl, true);
+    setStatus(`${help.title} (${(error as Error)?.message ?? 'sin detalles'})`);
+  }
+  void refreshCameraList();
 }
 
 /** Ajustes del sistema que arreglan el último error de cámara, si los hay. */
@@ -664,10 +740,15 @@ async function startDetector(): Promise<boolean> {
   try {
     setStage('Encendiendo la cámara…', 'Si el navegador lo pregunta, dale permiso para usarla.', true);
     setStatus('Pidiendo permiso de cámara…');
-    await startCamera(ui.video);
-    setStage('Cargando el detector…', 'Es un modelo de unos megas que se guarda en este equipo.', true);
-    setStatus('Cargando el detector de postura…');
-    landmarker = await createPoseLandmarker(setStatus, settings.modelQuality);
+    stopCamera(ui.video);
+    const opened = await startCamera(ui.video, settings.cameraId);
+    openedCamera = { deviceId: opened.deviceId ?? '', label: opened.label };
+    void refreshCameraList();
+    if (!landmarker) {
+      setStage('Cargando el detector…', 'Es un modelo de unos megas que se guarda en este equipo.', true);
+      setStatus('Cargando el detector de postura…');
+      landmarker = await createPoseLandmarker(setStatus, settings.modelQuality);
+    }
     // La primera inferencia compila los kernels y puede tardar segundos: se
     // hace aquí para que no se coma la ventana de calibración.
     setStatus('Preparando el detector…');
@@ -678,7 +759,10 @@ async function startDetector(): Promise<boolean> {
     setStatus('Cámara lista. El vídeo no sale de este equipo.');
     return true;
   } catch (error) {
-    const help = cameraErrorHelp(error as { name?: string; message?: string }, navigator.userAgent);
+    stopCamera(ui.video);
+    openedCamera = null;
+    const cameras = await refreshCameraList();
+    const help = cameraErrorHelp(error as { name?: string; message?: string }, navigator.userAgent, cameras?.length ?? null);
     setStage(help.title, help.text, false, help.settingsUrl, true);
     setStatus(`${help.title} (${(error as Error)?.message ?? 'sin detalles'})`);
     return false;
@@ -954,6 +1038,12 @@ function bindInputs(): void {
   ui.noticeRecalibrate.addEventListener('click', () => void calibrate());
   ui.stageSettings.addEventListener('click', openCameraSettings);
   ui.stageRetry.addEventListener('click', () => void calibrate());
+  ui.cameraSelect.addEventListener('change', () => {
+    update({ cameraId: ui.cameraSelect.value || null });
+    void switchCamera();
+  });
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => void refreshCameraList());
+  void refreshCameraList();
   ui.noticeDismiss.addEventListener('click', () => {
     reposition = clearReposition(reposition);
     renderNotice();

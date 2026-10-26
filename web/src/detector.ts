@@ -1,4 +1,11 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
+import {
+  betterCamera,
+  cameraAttempts,
+  isPermissionError,
+  type CameraInfo,
+  type VideoConstraints,
+} from './cameraPlan';
 
 /**
  * Dos modelos de MediaPipe Pose. El grande sitúa los puntos con más exactitud
@@ -60,15 +67,71 @@ export async function createPoseLandmarker(
   }
 }
 
-/** Abre la webcam. Todo el vídeo se queda en el navegador. */
-export async function startCamera(video: HTMLVideoElement): Promise<MediaStream> {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-    audio: false,
-  });
-  video.srcObject = stream;
-  await video.play();
-  return stream;
+/** Las cámaras que ve el sistema. Sin permiso todavía, sin nombres. */
+export async function listCameras(): Promise<CameraInfo[]> {
+  if (!navigator.mediaDevices?.enumerateDevices) return [];
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices
+    .filter((device) => device.kind === 'videoinput')
+    .map((device) => ({ deviceId: device.deviceId, label: device.label }));
+}
+
+export interface OpenedCamera {
+  stream: MediaStream;
+  deviceId: string | null;
+  label: string;
+}
+
+async function open(video: HTMLVideoElement, constraints: VideoConstraints): Promise<OpenedCamera> {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
+  try {
+    video.srcObject = stream;
+    await video.play();
+  } catch (error) {
+    stream.getTracks().forEach((track) => track.stop());
+    throw error;
+  }
+  const track = stream.getVideoTracks()[0];
+  return { stream, deviceId: track?.getSettings().deviceId ?? null, label: track?.label ?? '' };
+}
+
+/**
+ * Abre la webcam. Todo el vídeo se queda en el navegador.
+ *
+ * Prueba las cámaras en orden (ver `cameraAttempts`) hasta que una se abre: si
+ * la elegida ya no está, está ocupada o no acepta el tamaño, sigue con las
+ * demás. Un error de permiso para en seco: otra cámara no lo arreglaría. Si
+ * acaba abierta la de infrarrojos y hay una normal, se cambia a la normal.
+ */
+export async function startCamera(video: HTMLVideoElement, preferredId: string | null = null): Promise<OpenedCamera> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new DOMException('Este navegador no deja usar la cámara', 'NotSupportedError');
+  }
+  const cameras = await listCameras().catch(() => []);
+  let lastError: unknown = null;
+  for (const constraints of cameraAttempts(preferredId, cameras)) {
+    let opened: OpenedCamera;
+    try {
+      opened = await open(video, constraints);
+    } catch (error) {
+      if (isPermissionError(error)) throw error;
+      lastError = error;
+      continue;
+    }
+    // Con el permiso ya concedido el sistema da los nombres: ¿hay una mejor?
+    const named = await listCameras().catch(() => []);
+    const better = betterCamera(opened.label, named);
+    if (better && better !== opened.deviceId) {
+      try {
+        opened.stream.getTracks().forEach((track) => track.stop());
+        return await open(video, { width: { ideal: 640 }, height: { ideal: 480 }, deviceId: { exact: better } });
+      } catch {
+        return open(video, constraints);
+      }
+    }
+    return opened;
+  }
+  throw lastError ?? new DOMException('No hay ninguna cámara', 'NotFoundError');
 }
 
 export function stopCamera(video: HTMLVideoElement): void {

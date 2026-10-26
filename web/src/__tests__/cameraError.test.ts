@@ -26,9 +26,21 @@ describe('cameraErrorHelp', () => {
     expect(help.settingsUrl).toBeNull();
   });
 
-  it('cámara ocupada por otra aplicación', () => {
-    expect(cameraErrorHelp({ name: 'NotReadableError', message: 'Could not start video source' }, WINDOWS).title).toBe(
-      'La cámara está ocupada'
+  it('cámara que no arranca: si hay varias, sugiere elegir otra', () => {
+    const error = { name: 'NotReadableError', message: 'Could not start video source' };
+    expect(cameraErrorHelp(error, WINDOWS).title).toBe('La cámara no arranca');
+    expect(cameraErrorHelp(error, WINDOWS, 2).text).toContain('elige otra');
+    expect(cameraErrorHelp(error, WINDOWS, 1).text).not.toContain('elige otra');
+  });
+
+  it('si Windows no ve ninguna cámara, lleva a la tecla y al Administrador de dispositivos', () => {
+    const help = cameraErrorHelp({ name: 'NotFoundError', message: 'Requested device not found' }, WINDOWS, 0);
+    expect(help.title).toBe('Windows no reconoce la cámara');
+    expect(help.text).toContain('Administrador de dispositivos');
+    expect(help.text).toContain('F10');
+    // Un bloqueo de permisos se sigue explicando como tal aunque no se vean cámaras.
+    expect(cameraErrorHelp({ name: 'NotAllowedError', message: 'Permission denied by system' }, WINDOWS, 0).title).toBe(
+      'Windows tiene la cámara bloqueada'
     );
   });
 

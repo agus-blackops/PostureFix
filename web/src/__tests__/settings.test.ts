@@ -1,6 +1,14 @@
 import { DEFAULT_SETTINGS, LIMITS, sanitize } from '../settings';
 
 describe('sanitize (ajustes de la versión webcam)', () => {
+  it('guarda la cámara elegida y descarta valores raros', () => {
+    expect(DEFAULT_SETTINGS.cameraId).toBeNull();
+    expect(sanitize({ cameraId: 'abc123' }).cameraId).toBe('abc123');
+    expect(sanitize({ cameraId: '' }).cameraId).toBeNull();
+    expect(sanitize({ cameraId: 42 }).cameraId).toBeNull();
+    expect(sanitize({ cameraId: 'x'.repeat(300) }).cameraId).toBeNull();
+  });
+
   it('sin nada guardado devuelve los valores por defecto', () => {
     expect(sanitize(null)).toEqual(DEFAULT_SETTINGS);
   });

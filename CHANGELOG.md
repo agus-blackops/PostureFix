@@ -37,6 +37,13 @@ publicada en internet con su QR, y arreglos. Lo que se mide no cambia.
   portátiles ASUS y ofrece los botones «Abrir ajustes de la cámara» y «Probar
   otra vez». También distingue el permiso denegado en el navegador, la cámara
   ocupada por otra aplicación y la falta de cámara.
+- Portátil: la cámara se abre aunque la de siempre falle. Prueba primero la
+  elegida, luego las normales y la de infrarrojos (la de Windows Hello, que en
+  muchos ASUS sale la primera y no ve bien a la persona) la última; si acaba
+  abierta la de infrarrojos y hay otra, cambia sola. Nuevo selector **Cámara**
+  en Ajustes → Detector, que dice cuál se está usando. Si Windows no ve
+  ninguna cámara, lo dice y explica cómo encenderla (tecla de la cámara,
+  MyASUS, Administrador de dispositivos).
 
 ## 2.0.0
 

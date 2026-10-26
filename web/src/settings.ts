@@ -30,6 +30,8 @@ export interface WebSettings {
   modelQuality: ModelQuality;
   /** Último escalón del aviso: pitido, cuenta o alarma completa. */
   maxAlertLevel: AlertLevel;
+  /** Cámara elegida (su identificador del navegador); `null`, la automática. */
+  cameraId: string | null;
 }
 
 export const DEFAULT_SETTINGS: WebSettings = {
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: WebSettings = {
   controlMode: false,
   modelQuality: 'full',
   maxAlertLevel: 'alarm',
+  cameraId: null,
 };
 
 export const LIMITS = {
@@ -83,6 +86,8 @@ export function sanitize(raw: Partial<Record<keyof WebSettings, unknown>> | null
     controlMode: flag('controlMode'),
     modelQuality: readChoice(input.modelQuality, ['full', 'lite'] as const, DEFAULT_SETTINGS.modelQuality),
     maxAlertLevel: readChoice(input.maxAlertLevel, ALERT_LEVELS, DEFAULT_SETTINGS.maxAlertLevel),
+    cameraId:
+      typeof input.cameraId === 'string' && input.cameraId.length > 0 && input.cameraId.length <= 256 ? input.cameraId : null,
   };
 }
 

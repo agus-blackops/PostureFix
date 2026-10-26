@@ -301,6 +301,19 @@
       #start.stop:active:not(:disabled) { border-radius: calc(var(--h) * 0.2); }
       .btn-plain { color: var(--tint); padding: 0 8px; }
       .btn-destructive { color: var(--red); }
+      .select {
+        flex: 0 1 auto;
+        max-width: 55%;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 0.5px solid var(--separator);
+        background: var(--fill);
+        color: var(--label);
+        font: inherit;
+        font-size: 15px;
+      }
+      .select option { color: #000; }
       .stage-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
       .stage-actions:not(:has(button:not([hidden]))) { display: none; }
       .btn-small { --h: 34px; padding: 0 16px; font-size: 15px; letter-spacing: -0.24px; }
@@ -692,6 +705,15 @@
           <div>
             <h3 class="group-header">Detector</h3>
             <div class="group-body glass">
+              <div class="row">
+                <label for="set-camera">
+                  Cámara
+                  <small id="camera-hint">La lista sale al encender la cámara.</small>
+                </label>
+                <select id="set-camera" class="select">
+                  <option value="">Automática</option>
+                </select>
+              </div>
               <div class="row">
                 <span class="row-text">Precisión</span>
                 <span class="segmented" id="set-modelo" role="radiogroup" aria-label="Precisión del detector">

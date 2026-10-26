@@ -14,11 +14,34 @@ export interface CameraHelp {
   settingsUrl: string | null;
 }
 
-export function cameraErrorHelp(error: { name?: string; message?: string } | null | undefined, userAgent: string): CameraHelp {
+/**
+ * @param cameraCount cuántas cámaras ve el sistema (`null` si no se sabe). Con
+ *   cero, el problema no es el permiso: Windows ni siquiera la reconoce.
+ */
+export function cameraErrorHelp(
+  error: { name?: string; message?: string } | null | undefined,
+  userAgent: string,
+  cameraCount: number | null = null
+): CameraHelp {
   const name = error?.name ?? '';
   const message = error?.message ?? '';
   const windows = /Windows/i.test(userAgent);
   const mac = /Mac OS X|Macintosh/i.test(userAgent);
+
+  // El sistema no ve ninguna cámara: está apagada o sin controlador.
+  if (cameraCount === 0 && name !== 'NotAllowedError' && name !== 'SecurityError') {
+    return {
+      title: windows ? 'Windows no reconoce la cámara' : 'No encuentro ninguna cámara',
+      text: windows
+        ? 'Pulsa la tecla con el dibujo de una cámara (en ASUS suele ser F10, a veces con Fn) y abre la tapita ' +
+          'de la webcam. Si sigue sin salir: clic derecho en Inicio → Administrador de dispositivos → Cámaras ' +
+          '(o «Dispositivos de imagen»), clic derecho en la cámara → «Habilitar dispositivo». En MyASUS, que la ' +
+          'cámara no esté desactivada. Luego pulsa «Probar otra vez».'
+        : 'Comprueba que la webcam no está apagada con una tecla o tapada, o conecta una por USB. Luego pulsa ' +
+          '«Probar otra vez».',
+      settingsUrl: windows ? WINDOWS_CAMERA_SETTINGS : null,
+    };
+  }
 
   // Lo bloquea el sistema, no el navegador: en Windows, la privacidad de la cámara.
   if (name === 'NotAllowedError' && /system/i.test(message)) {
@@ -55,13 +78,17 @@ export function cameraErrorHelp(error: { name?: string; message?: string } | nul
     };
   }
 
-  // Otra aplicación la tiene ocupada.
+  // Otra aplicación la tiene ocupada (o el controlador no arranca).
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') {
     return {
-      title: 'La cámara está ocupada',
+      title: 'La cámara no arranca',
       text:
-        'Otra aplicación la está usando (Teams, Zoom, la app Cámara, otra pestaña…). Ciérrala y pulsa ' +
-        '«Calibrar» otra vez.',
+        'Suele ser que otra aplicación la está usando (Teams, Zoom, la app Cámara, otra pestaña…): ciérrala. ' +
+        (cameraCount != null && cameraCount > 1
+          ? `Este equipo tiene ${cameraCount} cámaras: elige otra en Ajustes → Detector → Cámara. `
+          : '') +
+        (windows ? 'Si no, reinicia el portátil: a veces el controlador de la cámara se queda colgado. ' : '') +
+        'Luego pulsa «Probar otra vez».',
       settingsUrl: null,
     };
   }
