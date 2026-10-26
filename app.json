@@ -2,7 +2,7 @@
   "expo": {
     "name": "PostureFix",
     "slug": "posturefix",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "posturefix",
@@ -23,7 +23,7 @@
         ],
         "NSMotionUsageDescription": "PostureFix usa los sensores de movimiento (acelerómetro y giroscopio) para saber cuándo te encorvas y avisarte."
       },
-      "buildNumber": "200"
+      "buildNumber": "210"
     },
     "android": {
       "package": "com.posturefix.app",
@@ -40,7 +40,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "predictiveBackGestureEnabled": false,
-      "versionCode": 200
+      "versionCode": 210
     },
     "web": {
       "favicon": "./assets/favicon.png"

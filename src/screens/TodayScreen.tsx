@@ -9,6 +9,7 @@ import { Notice, Pill } from '../components/lists';
 import { Appear, Pop } from '../components/motion';
 import { Card } from '../components/Surface';
 import { expressionFor } from '../core/expression';
+import { FAIR_PRESET } from '../core/fair';
 import { formatDegrees, formatDuration } from '../core/format';
 import { isAlerting, type Phase } from '../core/postureEngine';
 import { PROFILE_IDS, PROFILE_NAMES, calibrationKind, type ProfileId } from '../core/profiles';
@@ -63,6 +64,10 @@ const useStyles = makeStyles((t) => ({
   goalText: { flex: 1, gap: 2 },
   goalTitle: { ...type.headline, color: t.colors.label },
   goalBody: { ...type.footnote, color: t.colors.secondaryLabel },
+  fair: { gap: spacing.md },
+  fairHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  fairTitle: { ...type.headline, color: t.colors.tintText },
+  fairBody: { ...type.subheadline, color: t.colors.secondaryLabel },
   reminder: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center' },
   reminderText: { ...type.footnote, color: t.colors.secondaryLabel },
   footer: { ...type.footnote, color: t.colors.tertiaryLabel, textAlign: 'center', paddingHorizontal: spacing.lg },
@@ -83,13 +88,17 @@ export function TodayScreen({ onCalibrate, onOpenProgress }: { onCalibrate: () =
   const { settings, profile, engine, tilt, running } = monitor;
   const kind = calibrationKind(profile);
   const calibrated = kind !== 'none';
-  const controlMode = settings.controlMode;
+  const fairMode = settings.fairMode;
+  // En modo feria se avisa aunque esté puesta la sesión de control.
+  const controlMode = settings.controlMode && !fairMode;
+  const thresholdDeg = fairMode ? Math.min(profile.thresholdDeg, FAIR_PRESET.thresholdDeg) : profile.thresholdDeg;
+  const graceSeconds = fairMode ? FAIR_PRESET.graceMs / 1000 : profile.graceSeconds;
   const color = phaseColor(colors, engine.phase, controlMode);
   const alerting = isAlerting(engine.phase);
   const label = controlMode && alerting ? 'Mala postura registrada (sin avisar)' : PHASE_LABEL[engine.phase];
   const { urgency, shape } = expressionFor(engine.phase, controlMode);
-  const graceProgress = engine.badMs / Math.max(1, profile.graceSeconds * 1000);
-  const graceLeft = Math.max(0, (1 - graceProgress) * profile.graceSeconds);
+  const graceProgress = engine.badMs / Math.max(1, graceSeconds * 1000);
+  const graceLeft = Math.max(0, (1 - graceProgress) * graceSeconds);
   const showGrace = engine.phase === 'slouching' && graceProgress > 0;
   const calibrating = monitor.calibration.step !== 'idle' && monitor.calibration.step !== 'done' && monitor.calibration.step !== 'failed';
   const profileName = PROFILE_NAMES[settings.activeProfile];
@@ -111,6 +120,7 @@ export function TodayScreen({ onCalibrate, onOpenProgress }: { onCalibrate: () =
           color={monitor.headphones.connected ? colors.green : colors.neutral}
           emphasized={monitor.headphones.connected}
         />
+        {fairMode ? <Pill label="Modo feria" color={colors.tint} emphasized /> : null}
         {controlMode ? <Pill label="Sesión de control" color={colors.yellow} emphasized /> : null}
         {running && monitor.outsideSchedule ? <Pill label="Fuera de horario" color={colors.neutral} emphasized /> : null}
       </Appear>
@@ -124,6 +134,33 @@ export function TodayScreen({ onCalibrate, onOpenProgress }: { onCalibrate: () =
           disabled={running}
         />
       </Appear>
+
+      {fairMode ? (
+        <Appear index={2}>
+          <Card style={styles.fair}>
+            <View style={styles.fairHead}>
+              <Icon name="star" size={20} color={colors.tintText} />
+              <Text style={styles.fairTitle}>Modo feria</Text>
+            </View>
+            <Text style={styles.fairBody}>
+              {calibrated
+                ? 'Siéntate recto, pulsa «Empezar a vigilar» y encórvate: pita al segundo. La alarma dura unos segundos y suena más baja. Nada de esto va al historial.'
+                : 'Primero calibra con el móvil en el bolsillo. Mientras, «Demostración» enseña la secuencia entera sin tener que agacharse.'}
+            </Text>
+            <Button
+              label={monitor.previewing ? 'Sonando…' : 'Demostración'}
+              onPress={() => void monitor.previewAlarm()}
+              variant="prominent"
+              color={colors.tint}
+              onColor={colors.onTint}
+              disabled={monitor.previewing}
+              icon={<Icon name="bell" size={18} color={colors.onTint} />}
+              haptic="medium"
+            />
+            <Button label="Salir del modo feria" onPress={() => monitor.updateSettings({ fairMode: false })} variant="plain" />
+          </Card>
+        </Appear>
+      ) : null}
 
       {monitor.sensorAvailable === false ? (
         <Notice
@@ -175,14 +212,14 @@ export function TodayScreen({ onCalibrate, onOpenProgress }: { onCalibrate: () =
         <Card style={styles.gaugeCard}>
           <View
             accessible
-            accessibilityLabel={`Inclinación ${Math.round(engine.deviationDeg)} grados, umbral ${Math.round(profile.thresholdDeg)}. ${label}.`}
+            accessibilityLabel={`Inclinación ${Math.round(engine.deviationDeg)} grados, umbral ${Math.round(thresholdDeg)}. ${label}.`}
             accessibilityLiveRegion="polite">
             <WavyRing
               size={236}
               stroke={16}
               progress={engine.deviationDeg / MAX_ANGLE}
               color={color}
-              markAt={profile.thresholdDeg / MAX_ANGLE}
+              markAt={thresholdDeg / MAX_ANGLE}
               urgency={urgency}>
               <View style={styles.shape}>
                 <MorphShape shape={calibrating ? 'circle' : shape} size={148} color={withAlpha(color, 0.13)} spin={urgency * 0.25} />
@@ -227,7 +264,7 @@ export function TodayScreen({ onCalibrate, onOpenProgress }: { onCalibrate: () =
               <ProgressBar progress={graceProgress} color={colors.yellow} height={6} />
             </View>
           ) : (
-            <Text style={styles.hint}>Umbral {formatDegrees(profile.thresholdDeg)} · la marca del anillo</Text>
+            <Text style={styles.hint}>Umbral {formatDegrees(thresholdDeg)} · la marca del anillo</Text>
           )}
         </Card>
       </Appear>

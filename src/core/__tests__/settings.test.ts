@@ -16,6 +16,12 @@ describe('sanitize (ajustes del móvil, v2)', () => {
     expect(sanitize(JSON.parse(JSON.stringify(stored)))).toEqual(stored);
   });
 
+  it('el modo feria viene apagado y se guarda (2.1)', () => {
+    expect(DEFAULT_SETTINGS.fairMode).toBe(false);
+    expect(sanitize({ fairMode: true }).fairMode).toBe(true);
+    expect(sanitize({ fairMode: 'yes' }).fairMode).toBe(false);
+  });
+
   it('un sí/no guardado como texto no se toma por verdadero', () => {
     const result = sanitize({ controlMode: 'true', voiceEnabled: 'false' });
     expect(result.controlMode).toBe(DEFAULT_SETTINGS.controlMode);

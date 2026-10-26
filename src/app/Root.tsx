@@ -54,7 +54,7 @@ function Shell() {
     { key: 'ajustes', label: 'Ajustes', icon: 'gear' },
   ];
 
-  const accent = monitor.running ? phaseColor(theme.colors, engine.phase, settings.controlMode) : theme.colors.neutral;
+  const accent = monitor.running ? phaseColor(theme.colors, engine.phase, settings.controlMode && !settings.fairMode) : theme.colors.neutral;
   const openCalibration = () => setCalibrating(true);
 
   return (
@@ -91,7 +91,7 @@ function Shell() {
         voiceEnabled={settings.voiceEnabled}
         vibrationEnabled={settings.vibrationEnabled}
       />
-      <AlertOverlay phase={engine.phase} countsSpoken={engine.countsSpoken} controlMode={settings.controlMode} />
+      <AlertOverlay phase={engine.phase} countsSpoken={engine.countsSpoken} controlMode={settings.controlMode && !settings.fairMode} />
     </View>
   );
 }

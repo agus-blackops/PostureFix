@@ -44,6 +44,8 @@ export interface Settings {
   controlMode: boolean;
   /** Toques suaves al pulsar. */
   uiHaptics: boolean;
+  /** Modo feria: avisos en corto y más bajos para enseñarlo en un stand. */
+  fairMode: boolean;
 
   theme: ThemeMode;
   schedule: Schedule;
@@ -71,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   manualHeadphones: false,
   controlMode: false,
   uiHaptics: true,
+  fairMode: false,
   theme: 'system',
   schedule: DEFAULT_SCHEDULE,
   standReminder: false,
@@ -110,6 +113,7 @@ export function sanitize(raw: Partial<Record<keyof Settings, unknown>> | null | 
     manualHeadphones: flag('manualHeadphones'),
     controlMode: flag('controlMode'),
     uiHaptics: flag('uiHaptics'),
+    fairMode: flag('fairMode'),
     theme: readChoice(input.theme, THEME_MODES, DEFAULT_SETTINGS.theme),
     schedule: sanitizeSchedule(input.schedule),
     standReminder: flag('standReminder'),

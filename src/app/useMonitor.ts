@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildFrame, slouchDeg, tiltOf, type Tilt } from '../core/bodyFrame';
 import { calibrateVectors, mostStableWindow } from '../core/calibration';
 import { isMoving, isTrustedReading, readingFromAccelerometer, readingFromDeviceMotion, type MotionReading } from '../core/motion';
+import { alertVolume, chooseAlarmSound, fairEngineConfig } from '../core/fair';
 import { createSmootherBank, smoothBankStep, type SmootherBank } from '../core/oneEuro';
 import { normalize, type Vector3 } from '../core/orientation';
 import {
@@ -54,6 +55,9 @@ const CAL_LEAN_MS = 2000;
 /** De la postura recta se usa el segundo y medio más quieto (a 20 Hz). */
 const CAL_WINDOW = 30;
 const CAL_LEAN_WINDOW = 20;
+
+/** Volumen de las alertas: en modo feria suena más bajo. */
+const volumeOf = (current: Settings) => alertVolume(current.volume, current.fairMode);
 
 export type CalibrationStep = 'idle' | 'prepare' | 'upright' | 'lean-prepare' | 'lean' | 'done' | 'failed';
 
@@ -151,6 +155,8 @@ export function useMonitor(): Monitor {
   const sessionStartedAtRef = useRef(0);
   const sessionProfileRef = useRef<ProfileId>('sentado');
   const previewingRef = useRef(false);
+  /** La sesión en curso ha pasado por el modo feria: no va al historial. */
+  const sessionFairRef = useRef(false);
 
   settingsRef.current = settings;
   historyRef.current = history;
@@ -158,20 +164,20 @@ export function useMonitor(): Monitor {
 
   const profile = activeProfileOf(settings);
 
-  const configFor = useCallback(
-    (p: Profile): EngineConfig => ({
+  const configFor = useCallback((p: Profile, fairMode: boolean): EngineConfig => {
+    const config: EngineConfig = {
       ...DEFAULT_ENGINE_CONFIG,
       thresholdDeg: p.thresholdDeg,
       graceMs: p.graceSeconds * 1000,
       maxLevel: p.maxAlertLevel,
-    }),
+    };
+    return fairMode ? fairEngineConfig(config) : config;
+  }, []);
+
+  const pickAlarmSound = useCallback(
+    (current: Settings, ears: HeadphonesInfo): AlarmSound => chooseAlarmSound(current, ears.connected),
     []
   );
-
-  const pickAlarmSound = useCallback((current: Settings, ears: HeadphonesInfo): AlarmSound => {
-    if (current.easAlways) return 'eas';
-    return ears.connected && current.easWithHeadphones ? 'eas' : 'siren';
-  }, []);
   const alarmSound = pickAlarmSound(settings, headphones);
 
   // --------------------------------------------------------- carga inicial ---
@@ -189,7 +195,7 @@ export function useMonitor(): Monitor {
       // La primera vez en la 2.0 los ajustes migrados de la 1.x se guardan ya.
       void saveSettings(stored);
       await audio.prepare().catch(() => undefined);
-      audio.setVolume(stored.volume);
+      audio.setVolume(volumeOf(stored));
       if (stored.notificationsEnabled) await prepareNotifications();
     })();
     return () => {
@@ -217,11 +223,12 @@ export function useMonitor(): Monitor {
     async (action: EngineAction) => {
       const current = settingsRef.current;
       const audio = audioRef.current;
-      // En una sesión de control se mide todo pero no se avisa de nada.
-      if (current.controlMode && action.type !== 'silence') return;
+      // En una sesión de control se mide todo pero no se avisa de nada (salvo en
+      // modo feria, que está para enseñar los avisos).
+      if (current.controlMode && !current.fairMode && action.type !== 'silence') return;
       switch (action.type) {
         case 'beep':
-          await audio?.playBeep(current.volume);
+          await audio?.playBeep(volumeOf(current));
           break;
         case 'speak':
           speak(action.text, current.voiceEnabled);
@@ -230,7 +237,7 @@ export function useMonitor(): Monitor {
           silence();
           break;
         case 'startAlarm':
-          await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), current.volume);
+          await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), volumeOf(current));
           break;
         case 'notify':
           await sendPostureAlert(action.title, action.body, current.notificationsEnabled);
@@ -252,7 +259,7 @@ export function useMonitor(): Monitor {
       setTilt(nextTilt);
       const current = settingsRef.current;
       setReminderLeftMs(
-        current.standReminder && runningRef.current && current.activeProfile !== 'de-pie'
+        current.standReminder && runningRef.current && current.activeProfile !== 'de-pie' && !current.fairMode
           ? Math.max(0, current.standEveryMinutes * 60_000 - reminderRef.current.sittingMs)
           : null
       );
@@ -301,8 +308,11 @@ export function useMonitor(): Monitor {
         return;
       }
 
-      // Fuera de horario no se avisa ni se cuenta tiempo.
-      const inside = isWithinSchedule(current.schedule, new Date(now));
+      if (current.fairMode) sessionFairRef.current = true;
+
+      // Fuera de horario no se avisa ni se cuenta tiempo. El modo feria no
+      // mira el horario: en el stand tiene que funcionar a cualquier hora.
+      const inside = current.fairMode || isWithinSchedule(current.schedule, new Date(now));
       if (inside !== !outsideRef.current) {
         outsideRef.current = !inside;
         setOutsideSchedule(!inside);
@@ -317,7 +327,7 @@ export function useMonitor(): Monitor {
       }
 
       // Recordatorio para levantarse (de pie no hace falta, y en control tampoco avisa).
-      if (current.standReminder && current.activeProfile !== 'de-pie') {
+      if (current.standReminder && current.activeProfile !== 'de-pie' && !current.fairMode) {
         const result = reminderStep(
           reminderRef.current,
           { dtMs, moving: isMoving(reading) },
@@ -334,7 +344,7 @@ export function useMonitor(): Monitor {
       const { state, actions } = step(
         engineRef.current,
         { deviationDeg, dtMs, trusted: trusted && !reposition.suspected },
-        configFor(activeProfile)
+        configFor(activeProfile, current.fairMode)
       );
       paint(state, currentTilt, state.phase !== engineRef.current.phase);
       actions.forEach((action) => void runAction(action));
@@ -412,7 +422,7 @@ export function useMonitor(): Monitor {
   const persist = useCallback((next: Settings) => {
     settingsRef.current = next;
     setSettings(next);
-    audioRef.current?.setVolume(next.volume);
+    audioRef.current?.setVolume(volumeOf(next));
     void saveSettings(next);
   }, []);
 
@@ -442,6 +452,13 @@ export function useMonitor(): Monitor {
   const recordSession = useCallback(() => {
     if (sessionStartedAtRef.current === 0) return;
     const state = engineRef.current;
+    // Lo de la feria son visitantes encorvándose a propósito: no es un dato.
+    if (sessionFairRef.current || settingsRef.current.fairMode) {
+      sessionStartedAtRef.current = 0;
+      engineRef.current = { ...createInitialState(), deviationDeg: state.deviationDeg };
+      setEngine(engineRef.current);
+      return;
+    }
     const record: SessionRecord = {
       startedAt: sessionStartedAtRef.current,
       durationMs: state.sessionMs,
@@ -471,9 +488,10 @@ export function useMonitor(): Monitor {
   const start = useCallback(async () => {
     if (!activeProfileOf(settingsRef.current).frame || runningRef.current) return;
     await audioRef.current?.prepare().catch(() => undefined);
-    audioRef.current?.setVolume(settingsRef.current.volume);
+    audioRef.current?.setVolume(volumeOf(settingsRef.current));
     if (settingsRef.current.notificationsEnabled) await prepareNotifications();
     reminderRef.current = createReminder();
+    sessionFairRef.current = settingsRef.current.fairMode;
     outsideRef.current = false;
     setOutsideSchedule(false);
     engineRef.current = startMonitoring(engineRef.current);
@@ -604,12 +622,13 @@ export function useMonitor(): Monitor {
     previewingRef.current = true;
     setPreviewing(true);
     const current = settingsRef.current;
-    const level = activeProfileOf(current).maxAlertLevel;
+    const level = current.fairMode ? 'alarm' : activeProfileOf(current).maxAlertLevel;
+    const volume = volumeOf(current);
     const audio = audioRef.current;
     const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     try {
       await audio?.prepare();
-      await audio?.playBeep(current.volume);
+      await audio?.playBeep(volume);
       await fireHaptic('warning', current.vibrationEnabled);
       if (level === 'beep') {
         await wait(DEFAULT_ENGINE_CONFIG.scareMs);
@@ -622,7 +641,7 @@ export function useMonitor(): Monitor {
       await wait(DEFAULT_ENGINE_CONFIG.countStepMs);
       if (level === 'count') return;
       speak(MESSAGES.alarm, current.voiceEnabled);
-      await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), current.volume);
+      await audio?.startAlarm(pickAlarmSound(current, headphonesRef.current), volume);
       await fireHaptic('alarm', current.vibrationEnabled);
       await wait(3500);
     } finally {

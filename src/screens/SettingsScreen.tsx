@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { View } from 'react-native';
+import { Linking, View } from 'react-native';
 
 import { useApp } from '../app/AppContext';
 import { DayChips, Segmented, Stepper, Toggle, type SegmentOption } from '../components/controls';
@@ -7,6 +7,7 @@ import { Row, RowValue, Section, SectionBlock } from '../components/lists';
 import { Appear } from '../components/motion';
 import type { AlertLevel } from '../core/postureEngine';
 import { PROFILE_IDS, PROFILE_LIMITS, PROFILE_NAMES, calibrationKind, type ProfileId } from '../core/profiles';
+import { FAIR_PRESET } from '../core/fair';
 import { DAY_INITIALS, SCHEDULE_STEP_MIN, describeSchedule, formatClock } from '../core/schedule';
 import { LIMITS, clamp, type Settings, type ThemeMode } from '../core/settings';
 import { makeStyles, spacing, useTheme } from '../theme';
@@ -38,6 +39,7 @@ type ToggleKey =
   | 'notificationsEnabled'
   | 'keepAwake'
   | 'controlMode'
+  | 'fairMode'
   | 'uiHaptics'
   | 'standReminder';
 
@@ -46,6 +48,9 @@ const useStyles = makeStyles(() => ({
 }));
 
 const fmt = (n: number, decimals = 0) => n.toFixed(decimals).replace('.', ',');
+
+/** La versión de webcam publicada en GitHub Pages. */
+export const WEB_URL = 'https://agus-blackops.github.io/PostureFix/';
 
 export function SettingsScreen({ onCalibrate }: { onCalibrate: () => void }) {
   const styles = useStyles();
@@ -103,6 +108,16 @@ export function SettingsScreen({ onCalibrate }: { onCalibrate: () => void }) {
             iconColor={kind === 'none' ? colors.neutral : colors.green}
             onPress={onCalibrate}
           />
+        </Section>
+      </Appear>
+
+      <Appear index={2}>
+        <Section
+          header="Feria"
+          footer={`Para enseñarlo en el stand: pita al segundo de encorvarse, la alarma se corta a los ${fmt(
+            FAIR_PRESET.maxAlarmMs / 1000
+          )} s y suena más baja (el tono EAS, solo con auriculares). No mira el horario ni guarda sesiones en el historial.`}>
+          <Row title="Modo feria" icon="star" iconColor={colors.tint} accessory={toggle('fairMode', 'Modo feria')} />
         </Section>
       </Appear>
 
@@ -269,6 +284,12 @@ export function SettingsScreen({ onCalibrate }: { onCalibrate: () => void }) {
           <Row
             title="Sensor"
             accessory={<RowValue>{monitor.fused ? 'Giroscopio + acelerómetro' : monitor.fused === false ? 'Acelerómetro' : '—'}</RowValue>}
+          />
+          <Row
+            title="Versión para portátil"
+            subtitle="Con la webcam, en el navegador"
+            accessory={<RowValue>Abrir</RowValue>}
+            onPress={() => void Linking.openURL(WEB_URL).catch(() => undefined)}
           />
         </Section>
       </Appear>

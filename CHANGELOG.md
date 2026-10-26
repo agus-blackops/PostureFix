@@ -1,5 +1,36 @@
 # Cambios
 
+## 2.1.0
+
+La actualización para la feria: modo feria en el móvil, la versión de portátil
+publicada en internet con su QR, y arreglos. Lo que se mide no cambia.
+
+**Modo feria (móvil)**
+
+- Nuevo interruptor en Ajustes → Feria. Pita al segundo de encorvarse (umbral
+  como mucho de 18°), la alarma se corta sola a los 6 s y suena más baja
+  (volumen máximo del 70 %; el tono EAS, solo con auriculares).
+- En Hoy aparece una tarjeta con el botón **Demostración**, que enseña la
+  secuencia entera sin tener que agacharse, y otro para salir del modo.
+- No mira el horario ni el recordatorio para levantarse, avisa aunque esté
+  puesta la sesión de control y no guarda nada en el historial: son visitantes
+  encorvándose a propósito, no datos del experimento.
+
+**PostureFix Web**
+
+- Nuevo workflow **Web** que construye la versión de webcam y la publica en
+  GitHub Pages: `https://agus-blackops.github.io/PostureFix/`. En los PR solo
+  la construye para comprobar que no se rompe.
+- El panel de la feria lleva un **QR** a esa dirección, y la app de móvil un
+  enlace en Ajustes → Acerca de.
+
+**Arreglos y pulido**
+
+- Escritorio: si al abrir una versión ya había otra abierta en la bandeja, la
+  app dice qué versión es cada una y deja elegir con cuál seguir, en vez de
+  mostrar la vieja sin más. Funciona a partir de que la abierta sea la 2.1.
+- Escritorio: la versión aparece en el icono de la bandeja y en su menú.
+
 ## 2.0.0
 
 La app de móvil hecha de nuevo desde cero, con más precisión, ajustes nuevos, APK

@@ -97,6 +97,14 @@ npm run web:dev      # http://localhost:8080
 `npm run web:build` deja la app lista en `web/dist/` para servirla donde quieras. Hace falta
 `localhost` o `https://`, que es lo único que acepta el navegador para dar acceso a la cámara.
 
+### Publicada en internet (2.1)
+
+El workflow **Web** la publica en **https://agus-blackops.github.io/PostureFix/** cada vez que
+algo llega a `main` (o a mano desde la pestaña *Actions*). Para que funcione hace falta, una sola
+vez, **Settings → Pages → Source: «GitHub Actions»**. GitHub Pages solo publica desde la rama
+principal, así que los cambios de un PR salen al fusionarlo. El panel de la feria lleva un QR a
+esa dirección.
+
 ### Qué mide
 
 Una cámara frontal no ve la curva de la columna, pero sí cuatro señales que la delatan, todas
@@ -150,7 +158,7 @@ cosas que el navegador no puede:
 
 Las versiones publicadas están en **[Releases](https://github.com/agus-blackops/PostureFix/releases)**,
 con los ejecutables y el APK de Android adjuntos: no caducan y se descargan sin iniciar sesión.
-Se publican solos al etiquetar una versión (`git tag v2.0.0 && git push origin v2.0.0`): el
+Se publican solos al etiquetar una versión (`git tag v2.1.0 && git push origin v2.1.0`): el
 workflow **App de escritorio** sube los de Windows y Linux y el workflow **App de móvil**, el APK.
 
 Para probar un cambio que aún no es versión, cada ejecución de esos workflows deja los mismos
@@ -159,10 +167,14 @@ archivos como artefactos: pestaña *Actions* → la ejecución más reciente →
 
 | Archivo | Para qué |
 | --- | --- |
-| `PostureFix-2.0.0.apk` | Android: se descarga en el móvil y se instala |
-| `PostureFix-portable-2.0.0.exe` | Windows sin instalar: se descarga y se abre |
-| `PostureFix-instalador-2.0.0.exe` | Windows con instalador y acceso directo |
-| `PostureFix-2.0.0.AppImage` | Linux |
+| `PostureFix-2.1.0.apk` | Android: se descarga en el móvil y se instala |
+| `PostureFix-portable-2.1.0.exe` | Windows sin instalar: se descarga y se abre |
+| `PostureFix-instalador-2.1.0.exe` | Windows con instalador y acceso directo |
+| `PostureFix-2.1.0.AppImage` | Linux |
+
+Si al abrir una versión nueva del ejecutable aparece la anterior, es que la anterior seguía abierta
+en la bandeja del sistema: clic derecho en su icono → **Salir**, y vuelve a abrir la nueva. Desde la
+2.1, la propia app pregunta con cuál seguir.
 
 **Instalar el APK**: ábrelo desde el móvil y, si Android lo pide, permite instalar apps de
 esa fuente (el navegador o la app de archivos). Está firmado con una clave de pruebas, no
@@ -258,6 +270,10 @@ Hoy, Progreso, Labs y Ajustes):
 - **Tema** (2.0): el del sistema, claro u oscuro.
 - **Toques al pulsar**: la vibración suave de botones e interruptores, aparte de la de las
   alertas.
+- **Modo feria** (2.1): para enseñarlo en un stand. Pita al segundo de encorvarse, la alarma se
+  corta a los 6 s y suena más baja (el tono EAS, solo con auriculares). No mira el horario, avisa
+  aunque esté puesta la sesión de control y no guarda nada en el historial. En Hoy sale el botón
+  **Demostración**, que enseña la secuencia entera sin agacharse.
 - En la versión de portátil, **precisión del detector** (modelo grande o ligero) y
   **modo feria**, que deja los tiempos cortos para enseñarlo en un stand.
 
@@ -321,7 +337,7 @@ sonidos y los iconos que se versionan en `assets/`:
 
 ## Versiones
 
-`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **2.0.0**, la
+`CHANGELOG.md` lleva la cuenta de lo que cambia en cada versión. La actual es la **2.1.0**, la
 que va a la feria.
 
 ## Panel para la feria
@@ -352,6 +368,7 @@ src/core/profiles.ts         perfiles sentado, de pie y en clase
 src/core/schedule.ts         horario de vigilancia (con tests)
 src/core/reminder.ts         recordatorio para levantarse (con tests)
 src/core/trial.ts            prueba gratis de Labs (con tests)
+src/core/fair.ts             modo feria: secuencia corta, volumen y alarma (con tests)
 src/core/settings.ts         ajustes persistidos y paso de la 1.x a la 2.0 (con tests)
 src/core/sessionLog.ts       historial de sesiones y comparación (con tests)
 src/core/spring.ts           muelles de Material 3 Expressive para RN y CSS (con tests)

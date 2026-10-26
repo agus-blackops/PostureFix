@@ -11,9 +11,10 @@
  *     pestaña normal el navegador lo bajaría a ~1 fotograma por segundo), y al
  *     cerrar la ventana la app se queda en la bandeja del sistema.
  */
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { app, BrowserWindow, Menu, Tray, nativeImage, net, powerSaveBlocker, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, dialog, nativeImage, net, powerSaveBlocker, protocol, shell } = require('electron');
 
 const DIST = path.join(__dirname, '..', 'web', 'dist');
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
@@ -32,11 +33,15 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-// Una sola instancia: la segunda sólo trae al frente la ventana existente.
-if (!app.requestSingleInstanceLock()) {
+/** El ejecutable de esta copia: el portable se descomprime en una carpeta temporal. */
+const launcherPath = () => process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+
+// Una sola instancia: la segunda trae al frente la ventana existente. Desde la
+// 2.1 además dice qué versión es, para que no parezca que «se abre la vieja».
+if (!app.requestSingleInstanceLock({ version: app.getVersion(), execPath: launcherPath() })) {
   app.quit();
 } else {
-  app.on('second-instance', showWindow);
+  app.on('second-instance', (_event, _argv, _cwd, data) => onSecondInstance(data));
   app.whenReady().then(start);
 }
 
@@ -96,12 +101,49 @@ function showWindow() {
   window.focus();
 }
 
+/**
+ * Alguien ha abierto otra copia. Si es otra versión, se pregunta con cuál
+ * seguir: la que ya estaba abierta suele estar escondida en la bandeja.
+ */
+function onSecondInstance(data) {
+  showWindow();
+  const current = app.getVersion();
+  const other = data && typeof data === 'object' ? data : {};
+  const valid =
+    typeof other.version === 'string' &&
+    /^[0-9][0-9A-Za-z.-]{0,30}$/.test(other.version) &&
+    typeof other.execPath === 'string' &&
+    path.isAbsolute(other.execPath) &&
+    fs.existsSync(other.execPath);
+  if (!valid || other.version === current) return;
+
+  void dialog
+    .showMessageBox(window, {
+      type: 'question',
+      title: 'PostureFix ya estaba abierto',
+      message: `Ya estaba abierta la versión ${current}, en la bandeja del sistema.`,
+      detail: `Has abierto la ${other.version}. Solo puede haber una abierta a la vez.`,
+      buttons: [`Abrir la ${other.version}`, `Seguir con la ${current}`],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    })
+    .then(({ response }) => {
+      if (response !== 0) return;
+      // Se cierra esta y, al salir, arranca la otra.
+      app.relaunch({ execPath: other.execPath, args: [] });
+      quitting = true;
+      app.quit();
+    });
+}
+
 function createTray() {
   const image = nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 });
   tray = new Tray(image);
-  tray.setToolTip('PostureFix — vigilando tu postura');
+  tray.setToolTip(`PostureFix ${app.getVersion()} — vigilando tu postura`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      { label: `PostureFix ${app.getVersion()}`, enabled: false },
       { label: 'Mostrar PostureFix', click: showWindow },
       { type: 'separator' },
       {
