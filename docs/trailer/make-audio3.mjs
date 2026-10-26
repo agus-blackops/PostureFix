@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Banda sonora del tráiler 3 (77 s, con escenas en 3D). Cada sonido cae en el
+ * Banda sonora del tráiler 3 (91 s, con escenas en 3D y una pelea). Cada sonido cae en el
  * instante exacto de `trailer3.html`: latidos, golpe de título, música a 120 ppm,
  * pitido, cuenta y tono EAS de la app, un silbido al salir cada eje 3D, y las
  * «indirectas» del final con clics de máquina de escribir y un golpe seco.
@@ -10,7 +10,7 @@
 import { createMixer } from './audio-lib.mjs';
 import { makeMusic } from './audio-music.mjs';
 
-const DURATION = 77.5;
+const DURATION = 91.5;
 const mixer = createMixer(DURATION);
 const { TAU, mtof, clamp01, add, tone, noise, kick, hat, whoosh, impact, silenceGap, finish } = mixer;
 const music = makeMusic(mixer);
@@ -91,30 +91,55 @@ impact(59.5, 0.5);
 music(59.5, 64.5, 59.5, { drumsFrom: 59.5, snareFrom: 60.5, arpAmp: 0.115 });
 [60.0, 60.9, 61.8, 62.7].forEach((t) => { whoosh(t - 0.15, 0.3, 0.12); ping(t, 880, 0.12); });
 
-// ------------------------------------------------ 64.5–71: las indirectas
+// ------------------------------------------------ 64.5–71: las indirectas (el horno de 2025)
 add(64.5, 6.5, (tr) => {
   const g = 0.07 + 0.08 * clamp01(tr / 5.5);
   return (Math.sin(TAU * 49 * tr) + 0.6 * Math.sin(TAU * 73.4 * tr)) * g * Math.min(1, tr / 0.4) * Math.min(1, (6.5 - tr) / 0.1);
 });
-[65.2, 66.7, 68.0, 69.3].forEach((t0, i) => {
+[65.0, 66.2, 67.4, 68.6].forEach((t0, i) => {
   // Chispazo de glitch al aparecer y clics de máquina de escribir.
   noise(t0, 0.18, { amp: 0.22, tau: 0.05, hp: true });
   tone(t0, 0.15, 1800 + i * 150, { amp: 0.12, tau: 0.04, shape: 'square' });
   for (let k = 0; k < 14; k++) noise(t0 + k * 0.04, 0.03, { amp: 0.07, tau: 0.01, hp: true, pan: k % 2 ? 0.3 : -0.3 });
   kick(t0, 0.3);
 });
-tone(66.4, 1.4, 2093, { amp: 0.16, tau: 0.5, shape: 'bell' }); // el «ding» del horno
-riser(66.9, 0.9, 0.18); // sube la temperatura
-ping(68.5, 660, 0.18); // sube el ángulo… y esta vez avisa
-riser(69.3, 1.2, 0.3);
-silenceGap(70.45, 70.5);
-impact(70.5, 0.8); // «REVANCHA.»
-[0.12, 0.24].forEach((d) => noise(70.5 + d, 0.1, { amp: 0.25, tau: 0.03, hp: true }));
+tone(65.7, 1.4, 2093, { amp: 0.16, tau: 0.5, shape: 'bell' }); // el «ding» del horno
+riser(66.5, 0.8, 0.18); // sube la temperatura
+ping(67.9, 660, 0.18); // sube el ángulo… y esta vez avisa
+riser(68.6, 1.2, 0.3);
+silenceGap(69.75, 69.8);
+impact(69.8, 0.8); // «REVANCHA.»
+[0.12, 0.24].forEach((d) => noise(69.8 + d, 0.1, { amp: 0.25, tau: 0.03, hp: true }));
 
-// ------------------------------------------------ 71–77: el cierre
-impact(71.0, 0.85);
-kick(71.0, 0.6);
-[45, 57, 60, 64, 69].forEach((m) => tone(71.0, 5.5, mtof(m), { amp: 0.08, a: 0.05, tau: 2.2, shape: 'tri' }));
-[81, 76, 72, 79, 84, 88].forEach((m, k) => tone(71.5 + k * 0.45, 2.2, mtof(m), { amp: 0.09, tau: 1.0, shape: 'bell', pan: k % 2 ? 0.4 : -0.4 }));
+// ------------------------------------------------ 71–85: la pelea (3D)
+const F0 = 71.0;
+silenceGap(70.95, 71.0);
+impact(F0, 0.85);
+tone(F0 + 0.5, 1.2, 1568, { amp: 0.2, tau: 0.5, shape: 'bell' }); // campana: ronda 1
+for (let k = 0; k < 6; k++) kick(F0 + 0.2 + k * 0.2, 0.12 + 0.03 * k); // pasos al entrar
+noise(F0 + 0.7, 0.9, { amp: 0.2, tau: 9, a: 0.85, lp: (tr) => 300 + 8000 * clamp01(tr / 0.9) ** 2 });
+impact(F0 + 1.5, 0.7); // ¡PELEA!
+music(F0 + 2.0, F0 + 10.3, F0 + 1.5, { drumsFrom: F0 + 2.0, snareFrom: F0 + 2.5, arpAmp: 0.12, padAmp: 0.05 });
+const punch = (t, power = 0.6) => { kick(t, power); noise(t, 0.12, { amp: 0.35 * power, tau: 0.04, lp: () => 3000 }); };
+whoosh(F0 + 2.3, 0.35, 0.18); // el puño del horno falla
+whoosh(F0 + 3.3, 0.3, 0.14); tone(F0 + 3.4, 0.2, 1046, { amp: 0.3, a: 0.004, hold: true, shape: 'square' }); punch(F0 + 3.65); // pitido que pega
+noise(F0 + 4.6, 0.8, { amp: 0.3, tau: 0.5, lp: (tr) => 500 + 600 * tr }); punch(F0 + 5.3, 0.7); // calor que pega
+[[5.8, 660], [6.3, 784], [6.8, 988]].forEach(([d, f]) => { whoosh(F0 + d - 0.05, 0.2, 0.12); tone(F0 + d, 0.5, f, { amp: 0.34, tau: 0.14, shape: 'bell' }); punch(F0 + d + 0.25); });
+riser(F0 + 8.0, 0.4, 0.3);
+noise(F0 + 8.4, 0.7, { amp: 0.4, tau: 0.35, lp: (tr) => 400 + 500 * tr }); punch(F0 + 8.9, 0.7); // llamarada
+// Carga de PostureFix: un tono que sube, y el tono EAS al soltarlo.
+add(F0 + 9.2, 0.6, (tr) => Math.sin(TAU * (200 + 1200 * tr * tr) * tr) * 0.18 * Math.min(1, tr / 0.05));
+add(F0 + 9.8, 0.6, (tr) => (Math.sin(TAU * 853 * tr) + Math.sin(TAU * 960 * tr)) * 0.17 * Math.min(1, tr / 0.01) * Math.min(1, (0.6 - tr) / 0.03));
+silenceGap(F0 + 10.25, F0 + 10.3);
+impact(F0 + 10.3, 1.0); // K.O.
+tone(F0 + 10.6, 1.6, 2093, { amp: 0.18, tau: 0.6, shape: 'bell' }); // se abre la puerta: ¡ding!
+add(F0 + 10.85, 0.5, (tr) => Math.sin(TAU * (300 + 900 * tr) * tr) * Math.exp(-tr / 0.2) * 0.3); // boing de la tostada
+[72, 76, 79, 84, 88].forEach((m, k) => tone(F0 + 11.8 + k * 0.12, 2.2, mtof(m), { amp: 0.12, tau: 0.9, shape: 'bell', pan: (k - 2) / 4 })); // victoria
 
-finish(process.argv[2] || 'trailer3.wav', { fadeOutAt: 75.9, fadeOutLen: 1.5 });
+// ------------------------------------------------ 85–91: el cierre
+impact(85.0, 0.85);
+kick(85.0, 0.6);
+[45, 57, 60, 64, 69].forEach((m) => tone(85.0, 5.5, mtof(m), { amp: 0.08, a: 0.05, tau: 2.2, shape: 'tri' }));
+[81, 76, 72, 79, 84, 88].forEach((m, k) => tone(85.5 + k * 0.45, 2.2, mtof(m), { amp: 0.09, tau: 1.0, shape: 'bell', pan: k % 2 ? 0.4 : -0.4 }));
+
+finish(process.argv[2] || 'trailer3.wav', { fadeOutAt: 89.9, fadeOutLen: 1.5 });

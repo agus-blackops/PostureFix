@@ -25,12 +25,16 @@ a pantalla completa, las funciones de la 2.0 y un QR final.
 
 ## Tráiler 3 (2D + 3D, largo)
 
-`PostureFix-trailer3.mp4` — 77 s, 1920×1080, con música y efectos. Mezcla escenas en 2D y en
+`PostureFix-trailer3.mp4` — 91 s, 1920×1080, con música y efectos. Mezcla escenas en 2D y en
 3D (three.js): la persona encorvándose y el título con el anillo, un móvil con la gravedad y el
 ángulo en vivo, y los ejes de la calibración en dos pasos (arriba, delante y lado) con el móvil
 inclinándose hacia delante, hacia atrás y de lado. Al final, unas **indirectas** con humor: el horno básico que les ganó en 2025 y la
 «revancha» de PostureFix (cuatro «señales» con palabras tapadas, un termómetro que sube y
 un anillo que se pone rojo). Es una broma sana, sin nombres ni burlas a nadie.
+Y sigue **la pelea** (14 s, en 3D): el Horno Básico, con cara de enfadado y guantes de boxeo, contra
+PostureFix, un móvil con piernas y la pantalla de cara. Barras de vida, ataques con nombre
+(¡PUÑO CALIENTE!, PITIDO, ¡CALOR!, UNO-DOS-TRES, ¡LLAMARADA!, ¡ALARMA EAS!), K.O., humo y tostadas
+saliendo del horno. Acaba con «Es una broma: ¡suerte a todos!».
 
 - `trailer3.html`: la animación (2D en SVG, 3D en un lienzo WebGL debajo).
 - `3d/scene3d.js`: las escenas en 3D; `build3d.mjs` las compila a `trailer3-3d.js`
