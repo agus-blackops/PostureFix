@@ -103,9 +103,12 @@ add(64.5, 6.5, (tr) => {
   for (let k = 0; k < 14; k++) noise(t0 + k * 0.04, 0.03, { amp: 0.07, tau: 0.01, hp: true, pan: k % 2 ? 0.3 : -0.3 });
   kick(t0, 0.3);
 });
+tone(66.4, 1.4, 2093, { amp: 0.16, tau: 0.5, shape: 'bell' }); // el «ding» del horno
+riser(66.9, 0.9, 0.18); // sube la temperatura
+ping(68.5, 660, 0.18); // sube el ángulo… y esta vez avisa
 riser(69.3, 1.2, 0.3);
 silenceGap(70.45, 70.5);
-impact(70.5, 0.8); // «PRONTO.»
+impact(70.5, 0.8); // «REVANCHA.»
 [0.12, 0.24].forEach((d) => noise(70.5 + d, 0.1, { amp: 0.25, tau: 0.03, hp: true }));
 
 // ------------------------------------------------ 71–77: el cierre

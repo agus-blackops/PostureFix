@@ -27,7 +27,10 @@ const { chromium: pw } = require('playwright-core');
 const frames = join(workDir, `frames-${NAME}`);
 // SOLO_VIDEO=1 reutiliza los fotogramas de una pasada anterior (para cambiar el audio).
 const reuse = process.env.SOLO_VIDEO === '1' && existsSync(join(frames, 'f00000.jpg'));
-if (!reuse) {
+// FROM=64.5 vuelve a dibujar sólo desde ese segundo y reutiliza los fotogramas anteriores.
+const from = Number(process.env.FROM || 0);
+const partial = from > 0 && existsSync(join(frames, 'f00000.jpg'));
+if (!reuse && !partial) {
   rmSync(frames, { recursive: true, force: true });
   mkdirSync(frames, { recursive: true });
 }
@@ -42,7 +45,7 @@ await page.goto('file://' + join(here, `${NAME}.html`) + '?manual');
 await page.evaluate(() => Promise.all([document.fonts.ready, window.ready]));
 const total = await page.evaluate(() => window.DURATION);
 const count = Math.round(total * FPS);
-for (let i = 0; i < (reuse ? 0 : count); i++) {
+for (let i = partial ? Math.floor(from * FPS) : 0; i < (reuse ? 0 : count); i++) {
   await page.evaluate((t) => window.setT(t), i / FPS);
   await page.screenshot({ path: join(frames, `f${String(i).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 94 });
   if (i % 120 === 0) console.log(`fotograma ${i}/${count}`);

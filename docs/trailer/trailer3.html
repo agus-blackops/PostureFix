@@ -497,7 +497,7 @@ const TE = {};
 const T0 = 64.5;
 {
   const g = scenes.t;
-  TE.head = text(g, '¿Y AHORA QUÉ?', 140, 230, 150, 'disp', C.ink);
+  TE.head = text(g, 'ALGUIEN NOS DEBE ALGO', 140, 230, 150, 'disp', C.ink);
   TE.tag = text(g, '', 140, 450, 34, 'sansb', C.orange2);
   TE.gA = text(g, '', 140, 600, 70, 'sansb', 'rgba(255,69,58,0.55)');
   TE.gB = text(g, '', 140, 600, 70, 'sansb', 'rgba(90,176,255,0.55)');
@@ -507,35 +507,47 @@ const T0 = 64.5;
   TE.suf = el('tspan', { fill: C.ink }, TE.line);
   TE.hint = text(g, '', 140, 700, 40, 'sans', C.dim);
   TE.items = [
-    { pre: '¿Y si ya funcionara en tu ', key: 'navegador', suf: '?', t0: 65.2, t1: 66.7, hint: 'Sin instalar nada.' },
-    { pre: '¿Y en el ', key: 'Mac', suf: '?', t0: 66.7, t1: 68.0, hint: 'Con la misma alerta.' },
-    { pre: '¿Y si algo se pegara a tu ', key: 'espalda', suf: '?', t0: 68.0, t1: 69.3, hint: 'Un chip que pita.' },
-    { pre: '¿', key: 'Retos', suf: ' de 7 días rectos?', t0: 69.3, t1: 70.5, hint: 'Para los que se pican.' },
+    { pre: 'En 2025 nos ganó un ', key: 'horno', suf: ' básico.', t0: 65.2, t1: 66.7, hint: 'Sí. Un horno.' },
+    { pre: 'Lo único que sube es la ', key: 'temperatura', suf: '.', t0: 66.7, t1: 68.0, hint: 'Y nadie te avisa de nada.' },
+    { pre: 'Aquí lo que sube es el ', key: 'ángulo', suf: '.', t0: 68.0, t1: 69.3, hint: 'Y esta vez sí te avisa.' },
+    { pre: 'Este año: ', key: 'revancha', suf: '.', t0: 69.3, t1: 70.5, hint: 'Con cariño y sin rencores.' },
   ];
+  const oven = (ic, x, y, k = 1) => {
+    const o = el('g', { transform: `translate(${x} ${y}) scale(${k})` }, ic);
+    el('rect', { x: 0, y: 0, width: 440, height: 300, rx: 30, fill: '#2a2220', stroke: '#8a756c', 'stroke-width': 6 }, o);
+    el('rect', { x: 50, y: 90, width: 340, height: 170, rx: 18, fill: '#0e0908', stroke: C.orange, 'stroke-width': 5 }, o);
+    [90, 170, 250, 330].forEach((cx) => el('circle', { cx, cy: 45, r: 17, fill: '#5a4a44', stroke: '#8a756c', 'stroke-width': 3 }, o));
+    el('path', { d: 'M140 230 q20 -50 0 -90 M220 230 q20 -50 0 -90 M300 230 q20 -50 0 -90', stroke: C.orange2, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round', opacity: 0.8 }, o);
+    return o;
+  };
+  const ring = (ic, cx, cy, r, label) => {
+    el('circle', { cx, cy, r, fill: 'none', stroke: 'rgba(130,120,118,0.35)', 'stroke-width': r * 0.14 }, ic);
+    const a2 = -Math.PI / 2 + 0.55 * Math.PI * 2;
+    el('path', { d: `M${cx} ${cy - r} A${r} ${r} 0 1 1 ${cx + r * Math.cos(a2)} ${cy + r * Math.sin(a2)}`, fill: 'none', stroke: C.red, 'stroke-width': r * 0.14, 'stroke-linecap': 'round' }, ic);
+    text(ic, label, cx, cy + r * 0.28, r * 0.85, 'disp', C.ink, 'middle');
+  };
   TE.icons = [0, 1, 2, 3].map((i) => {
     const ic = el('g', { class: 'ic' }, g);
-    if (i === 0) { // ventana de navegador
-      el('rect', { x: 1280, y: 420, width: 460, height: 320, rx: 26, fill: 'rgba(255,255,255,0.06)', stroke: C.orange, 'stroke-width': 6 }, ic);
-      [0, 1, 2].forEach((k) => el('circle', { cx: 1322 + k * 34, cy: 462, r: 10, fill: [C.red, C.yellow, C.green][k] }, ic));
-      el('line', { x1: 1280, x2: 1740, y1: 500, y2: 500, stroke: C.orange, 'stroke-width': 4 }, ic);
-      text(ic, 'https://…', 1510, 640, 56, 'sansb', C.dim, 'middle');
-    } else if (i === 1) { // portátil
-      el('rect', { x: 1330, y: 430, width: 360, height: 230, rx: 18, fill: 'rgba(255,255,255,0.06)', stroke: C.orange, 'stroke-width': 6 }, ic);
-      el('path', { d: 'M1290 700 H1730 L1700 668 H1320 Z', fill: C.orange }, ic);
-      text(ic, '?', 1510, 600, 150, 'disp', C.orange, 'middle');
-    } else if (i === 2) { // chip con LED
-      el('rect', { x: 1340, y: 460, width: 340, height: 200, rx: 36, fill: '#1b1412', stroke: C.orange, 'stroke-width': 6 }, ic);
-      TE.led = el('circle', { cx: 1400, cy: 520, r: 16, fill: C.red }, ic);
-      el('path', { d: 'M1440 590 q40 -50 80 0 t80 0', stroke: C.orange2, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' }, ic);
-    } else { // siete casillas
-      [0, 1, 2, 3, 4, 5, 6].forEach((k) => {
-        el('rect', { x: 1260 + (k % 4) * 125, y: 450 + Math.floor(k / 4) * 125, width: 105, height: 105, rx: 24, fill: k < 5 ? C.green : 'rgba(255,255,255,0.1)' }, ic);
-        if (k < 5) el('path', { d: `M${1283 + (k % 4) * 125} ${505 + Math.floor(k / 4) * 125} l22 22 l42 -44`, stroke: '#0A0706', 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, ic);
-      });
+    if (i === 0) { // el horno
+      oven(ic, 1290, 430);
+      text(ic, 'HORNO BÁSICO', 1510, 780, 64, 'disp', C.dim, 'middle');
+    } else if (i === 1) { // termómetro subiendo
+      oven(ic, 1230, 450, 0.7);
+      el('rect', { x: 1600, y: 430, width: 44, height: 280, rx: 22, fill: '#1b1412', stroke: C.red, 'stroke-width': 5 }, ic);
+      TE.mercury = el('rect', { x: 1610, y: 500, width: 24, height: 200, rx: 12, fill: C.red }, ic);
+      el('circle', { cx: 1622, cy: 722, r: 38, fill: C.red }, ic);
+      text(ic, '350°', 1622, 800, 64, 'disp', C.red, 'middle');
+    } else if (i === 2) { // el anillo de PostureFix
+      ring(ic, 1510, 580, 150, '38°');
+      text(ic, 'POSTUREFIX', 1510, 800, 64, 'disp', C.orange, 'middle');
+    } else { // revancha: el horno se encoge, el anillo crece
+      oven(ic, 1240, 540, 0.45);
+      text(ic, 'VS', 1470, 640, 90, 'disp', C.dim, 'middle');
+      ring(ic, 1630, 560, 140, '38°');
     }
     return ic;
   });
-  TE.soon = text(g, 'PRONTO.', 960, 700, 420, 'disp', C.ink, 'middle');
+  TE.soon = text(g, 'REVANCHA.', 960, 700, 340, 'disp', C.ink, 'middle');
 }
 function updateT(t) {
   op(scenes.t, sceneAlpha(t, T0, 71.0, 0.15));
@@ -555,7 +567,7 @@ function updateT(t) {
     TE.gA.setAttribute('x', 140 + gl); TE.gB.setAttribute('x', 140 - gl);
     op(TE.gA, gl > 0.5 ? 1 : 0); op(TE.gB, gl > 0.5 ? 1 : 0);
     op(TE.line, 1);
-    TE.tag.textContent = `SEÑAL ${idx + 1} DE 4 · QUIZÁ…`; op(TE.tag, 1);
+    TE.tag.textContent = `SEÑAL ${idx + 1} DE 4`; op(TE.tag, 1);
     TE.hint.textContent = it.hint; op(TE.hint, seg(t, it.t0 + 0.6, it.t0 + 0.9) * (1 - seg(t, it.t1 - 0.15, it.t1)));
   } else { op(TE.line, 0); op(TE.gA, 0); op(TE.gB, 0); op(TE.tag, 0); op(TE.hint, 0); }
   TE.icons.forEach((ic, i) => {
@@ -564,7 +576,7 @@ function updateT(t) {
     op(ic, on ? seg(t, TE.items[i].t0 + 0.3, TE.items[i].t0 + 0.6) * (1 - seg(t, TE.items[i].t1 - 0.15, TE.items[i].t1)) : 0);
     ic.setAttribute('transform', 'translate(-450 380) scale(0.8)');
   });
-  if (TE.led) TE.led.setAttribute('opacity', (Math.floor(t * 4) % 2 ? 1 : 0.25).toFixed(2));
+  if (TE.mercury) { const h = 40 + 200 * clamp((t - 66.9) / 0.9); TE.mercury.setAttribute('y', 700 - h); TE.mercury.setAttribute('height', h); }
   // «PRONTO.» con un tembleque de glitch.
   const sp = seg(t, 70.5, 71.0);
   op(TE.soon, soon ? 1 : 0);
