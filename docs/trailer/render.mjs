@@ -32,10 +32,14 @@ if (!reuse) {
   mkdirSync(frames, { recursive: true });
 }
 
-const browser = await pw.launch({ executablePath: chromium || undefined });
+// El tráiler 3 lleva escenas en 3D: WebGL por software (SwiftShader) si no hay tarjeta.
+const browser = await pw.launch({
+  executablePath: chromium || undefined,
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+});
 const page = await browser.newPage({ viewport: { width: VW, height: VH } });
 await page.goto('file://' + join(here, `${NAME}.html`) + '?manual');
-await page.evaluate(() => document.fonts.ready);
+await page.evaluate(() => Promise.all([document.fonts.ready, window.ready]));
 const total = await page.evaluate(() => window.DURATION);
 const count = Math.round(total * FPS);
 for (let i = 0; i < (reuse ? 0 : count); i++) {

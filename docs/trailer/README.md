@@ -23,3 +23,19 @@ a pantalla completa, las funciones de la 2.0 y un QR final.
   que dejar el audio en `<carpeta>/trailer2.wav` (`node make-audio2.mjs <carpeta>/trailer2.wav`).
   Para el primero, el audio va en `<carpeta>/trailer.wav`.
 
+## Tráiler 3 (2D + 3D, largo)
+
+`PostureFix-trailer3.mp4` — 77 s, 1920×1080, con música y efectos. Mezcla escenas en 2D y en
+3D (three.js): la persona encorvándose y el título con el anillo, un móvil con la gravedad y el
+ángulo en vivo, y los ejes de la calibración en dos pasos (arriba, delante y lado) con el móvil
+inclinándose hacia delante, hacia atrás y de lado. Al final, unas **indirectas** (con «quizá…»,
+sin prometer nada) de lo que podría venir: la web, el Mac, un chip en la espalda y retos.
+
+- `trailer3.html`: la animación (2D en SVG, 3D en un lienzo WebGL debajo).
+- `3d/scene3d.js`: las escenas en 3D; `build3d.mjs` las compila a `trailer3-3d.js`
+  (hace falta `three`: `npm i --no-save three` y, si no está en este proyecto,
+  `NODE_PATH=<carpeta>/node_modules`).
+- `make-audio3.mjs` (con `audio-lib.mjs` y `audio-music.mjs`): la banda sonora.
+- `TRAILER=trailer3 node render.mjs <carpeta> <ffmpeg>`, con el audio en `<carpeta>/trailer3.wav`.
+  Usa WebGL por software (SwiftShader), así que va en cualquier equipo, aunque tarda unos 15 min.
+
