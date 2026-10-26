@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PostureFix — Tráiler 2 (vertical)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family: 'Big Shoulders Display'; font-weight: 800; src: url(fonts/BigShouldersDisplay-800.ttf); }
+  @font-face { font-family: 'Big Shoulders Display'; font-weight: 900; src: url(fonts/BigShouldersDisplay-900.ttf); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url(fonts/Inter-600.ttf); }
+  @font-face { font-family: 'Inter'; font-weight: 800; src: url(fonts/Inter-800.ttf); }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #wrap { position: absolute; left: 50%; top: 50%; width: 1080px; height: 1920px; transform-origin: center; }
+  svg { width: 1080px; height: 1920px; display: block; }
+  .disp { font-family: 'Big Shoulders Display', 'Liberation Sans', sans-serif; font-weight: 900; }
+  .sans { font-family: 'Inter', 'Liberation Sans', sans-serif; font-weight: 600; }
+  .sansb { font-family: 'Inter', 'Liberation Sans', sans-serif; font-weight: 800; }
+  text { white-space: pre; }
+</style>
+</head>
+<body>
+<div id="wrap"><svg id="svg" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<script>
+/*
+ * Tráiler 2: versión vertical y rápida (9:16). Igual que el primero, todo es
+ * una función del tiempo, `setT(t)`, para verlo en directo o dibujarlo
+ * fotograma a fotograma con render.mjs.
+ */
+const W = 1080, H = 1920, DURATION = 24;
+const C = {
+  bg: '#0A0706', orange: '#FF7A29', orange2: '#FF8A45', red: '#FF453A',
+  green: '#30D158', yellow: '#FFD60A', ink: '#FFFFFF',
+  dim: 'rgba(246,236,230,0.66)', dimmer: 'rgba(246,236,230,0.38)', line: '#5B4A44',
+};
+const QR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35 35" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h35v35H0z"/><path stroke="#0a0706" d="M1 1.5h7m1 0h2m1 0h2m3 0h1m2 0h3m1 0h1m2 0h7M1 2.5h1m5 0h1m1 0h2m1 0h2m1 0h1m1 0h2m5 0h2m1 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m2 0h3m1 0h4m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m1 0h1m9 0h1m2 0h1m2 0h1m1 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m2 0h2m1 0h2m2 0h3m3 0h3m1 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m2 0h3m2 0h3m1 0h1m2 0h3m2 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h5m2 0h5m4 0h1M1 9.5h1m1 0h2m1 0h3m1 0h1m4 0h5m2 0h4m1 0h1m2 0h1m1 0h2M3 10.5h3m3 0h7m1 0h2m1 0h2m2 0h1m2 0h2m1 0h3M1 11.5h3m1 0h1m1 0h2m2 0h2m1 0h1m2 0h1m1 0h1m2 0h3m2 0h4m1 0h2M1 12.5h3m1 0h1m2 0h2m3 0h1m2 0h3m1 0h1m1 0h2m2 0h3m1 0h1m2 0h1M2 13.5h1m1 0h2m1 0h3m1 0h1m1 0h1m1 0h3m3 0h6m2 0h2m1 0h2M1 14.5h6m3 0h1m2 0h3m2 0h1m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1M3 15.5h2m1 0h4m2 0h1m2 0h1m2 0h1m1 0h3m4 0h3M5 16.5h2m4 0h1m1 0h1m1 0h2m5 0h1m2 0h3m2 0h2M5 17.5h3m3 0h5m5 0h3m2 0h2m1 0h3M1 18.5h1m1 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m4 0h1m1 0h5m1 0h2m1 0h2M5 19.5h1m1 0h1m3 0h2m1 0h1m1 0h2m1 0h1m1 0h2m2 0h2m1 0h2m1 0h1M1 20.5h1m1 0h1m5 0h3m2 0h1m3 0h3m2 0h5m1 0h1m2 0h1M3 21.5h1m1 0h1m1 0h4m3 0h2m1 0h1m5 0h1m1 0h1m2 0h1m1 0h3M1 22.5h1m8 0h1m2 0h6m2 0h4m5 0h1m2 0h1M3 23.5h6m1 0h2m1 0h2m1 0h1m1 0h5m1 0h4m3 0h3M2 24.5h1m3 0h1m2 0h1m1 0h3m2 0h1m2 0h1m1 0h1m5 0h4m2 0h1M1 25.5h1m2 0h1m1 0h3m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m2 0h8m2 0h1M9 26.5h1m1 0h2m1 0h1m1 0h2m2 0h3m2 0h1m3 0h2m1 0h1M1 27.5h7m1 0h3m2 0h2m1 0h6m1 0h2m1 0h1m1 0h1M1 28.5h1m5 0h1m1 0h1m1 0h2m2 0h5m1 0h1m2 0h2m3 0h3M1 29.5h1m1 0h3m1 0h1m2 0h4m1 0h6m2 0h7m1 0h1m1 0h1M1 30.5h1m1 0h3m1 0h1m1 0h1m7 0h1m2 0h1m1 0h3m3 0h1m3 0h2M1 31.5h1m1 0h3m1 0h1m1 0h1m2 0h1m3 0h4m1 0h1m1 0h1m3 0h2m1 0h1M1 32.5h1m5 0h1m3 0h3m1 0h1m2 0h1m2 0h1m1 0h7m3 0h1M1 33.5h7m1 0h2m1 0h1m4 0h4m1 0h1m1 0h1m1 0h2m1 0h3"/></svg>`;
+
+// ----------------------------------------------------------------- utilidades
+const NS = 'http://www.w3.org/2000/svg';
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeIn = (x) => x * x * x;
+const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const spring = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-7 * x) * Math.cos(11 * x));
+const noise = (x) => { const s = Math.sin(x * 127.1) * 43758.5453; return s - Math.floor(s); };
+const smoothNoise = (x) => { const i = Math.floor(x), f = x - i; return lerp(noise(i), noise(i + 1), f * f * (3 - 2 * f)); };
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, k) => {
+  const A = hex(a), B = hex(b);
+  return '#' + A.map((v, i) => Math.round(lerp(v, B[i], clamp(k))).toString(16).padStart(2, '0')).join('');
+};
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs || {}) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function text(parent, str, x, y, size, cls, fill, anchor = 'middle') {
+  const e = el('text', { x, y, 'font-size': size, class: cls, fill, 'text-anchor': anchor }, parent);
+  e.textContent = str;
+  return e;
+}
+const op = (e, v) => e.setAttribute('opacity', clamp(v).toFixed(3));
+const place = (e, x = 0, y = 0, s = 1, r = 0, ox = 0, oy = 0) =>
+  e.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${r.toFixed(2)}) scale(${s.toFixed(4)}) translate(${-ox} ${-oy})`);
+const around = (e, cx, cy, s = 1, r = 0) => place(e, cx, cy, s, r, cx, cy);
+function reveal(e, t, a, dur = 0.5, dy = 28) {
+  const p = easeOut(seg(t, a, a + dur));
+  op(e, p);
+  e.setAttribute('transform', `translate(0 ${((1 - p) * dy).toFixed(2)})`);
+  return p;
+}
+/** Golpe de texto: aparece grande y se encaja con un muelle. */
+function slam(e, t, a, cx, cy, from = 1.7) {
+  const k = t - a;
+  op(e, k < 0 ? 0 : 1);
+  around(e, cx, cy, k < 0 ? from : lerp(from, 1, spring(clamp(k / 0.35))));
+}
+const sceneAlpha = (t, a, b, f = 0.2) => Math.min(seg(t, a, a + f), 1 - seg(t, b - f, b));
+
+// ------------------------------------------------------------------ escenario
+const svg = document.getElementById('svg');
+const defs = el('defs', {}, svg);
+const grad = (id, color, a) => {
+  const g = el('radialGradient', { id, cx: '50%', cy: '50%', r: '50%' }, defs);
+  el('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': a }, g);
+  el('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }, g);
+};
+grad('glowO', C.orange, 0.55); grad('glowR', C.red, 0.6);
+const vig = el('radialGradient', { id: 'vig', cx: '50%', cy: '50%', r: '75%' }, defs);
+el('stop', { offset: '55%', 'stop-color': '#000', 'stop-opacity': 0 }, vig);
+el('stop', { offset: '100%', 'stop-color': '#000', 'stop-opacity': 0.6 }, vig);
+
+const stage = el('g', {}, svg);
+el('rect', { width: W, height: H, fill: C.bg }, stage);
+const glow1 = el('ellipse', { cx: 240, cy: 1700, rx: 800, ry: 700, fill: 'url(#glowO)' }, stage);
+const glow2 = el('ellipse', { cx: 900, cy: 160, rx: 700, ry: 560, fill: 'url(#glowR)' }, stage);
+const sc = {};
+for (const id of ['a', 'b', 'c', 'd', 'e']) sc[id] = el('g', {}, stage);
+const flash = el('rect', { width: W, height: H, fill: '#fff', opacity: 0 }, svg);
+el('rect', { width: W, height: H, fill: 'url(#vig)' }, svg);
+const fade = el('rect', { width: W, height: H, fill: '#000', opacity: 0 }, svg);
+
+// ------------------------------------------------------------------ escena A
+const A = {};
+{
+  const g = sc.a;
+  A.words = [
+    ['¿CUÁNTO', 330, 215, C.ink, 0.0], ['TIEMPO', 530, 215, C.ink, 0.35],
+    ['LLEVAS', 730, 215, C.ink, 0.7], ['ASÍ?', 980, 290, C.orange, 1.05],
+  ].map(([s, y, size, fill, at]) => ({ e: text(g, s, 540, y, size, 'disp', fill), y, at }));
+  A.fig = el('g', {}, g);
+  const furn = { stroke: C.line, 'stroke-linecap': 'round', fill: 'none' };
+  el('path', { ...furn, 'stroke-width': 18, d: 'M1262 748 H1440' }, A.fig);
+  el('path', { ...furn, 'stroke-width': 14, d: 'M1258 748 L1244 540' }, A.fig);
+  el('path', { ...furn, 'stroke-width': 14, d: 'M1350 748 V930 M1290 936 H1410' }, A.fig);
+  el('path', { ...furn, 'stroke-width': 14, d: 'M1450 652 H1840 M1810 652 V940' }, A.fig);
+  el('path', { ...furn, 'stroke-width': 12, d: 'M1490 640 H1700 L1744 470' }, A.fig);
+  el('path', { stroke: '#8a756c', 'stroke-width': 40, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none', d: 'M1340 722 H1512 V904 H1590' }, A.fig);
+  A.arm = el('path', { stroke: '#8a756c', 'stroke-width': 26, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' }, A.fig);
+  A.back = el('path', { 'stroke-width': 50, 'stroke-linecap': 'round', fill: 'none' }, A.fig);
+  A.neck = el('path', { 'stroke-width': 26, 'stroke-linecap': 'round', fill: 'none' }, A.fig);
+  A.head = el('circle', { r: 50 }, A.fig);
+}
+function updateA(t) {
+  op(sc.a, sceneAlpha(t, 0, 2.5, 0.12) * (t < 0.005 ? 0 : 1));
+  A.words.forEach((w) => slam(w.e, t, w.at, 540, w.y - 80));
+  const s = easeInOut(seg(t, 1.3, 2.3));
+  const a = s * 0.66, hip = { x: 1340, y: 722 }, L = 232;
+  const N = { x: hip.x + L * Math.sin(a), y: hip.y - L * Math.cos(a) };
+  const c1 = { x: hip.x - 38 * s, y: hip.y - L * 0.45 }, c2 = { x: N.x - 22 * (1 - s) - 40 * s, y: N.y + L * 0.32 };
+  const col = mix(C.green, C.red, easeIn(s) * 1.1);
+  A.back.setAttribute('d', `M${hip.x} ${hip.y} C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${N.x} ${N.y}`); A.back.setAttribute('stroke', col);
+  const head = { x: N.x + 34 + 84 * s, y: N.y - 62 + 40 * s };
+  A.neck.setAttribute('d', `M${N.x} ${N.y} L${head.x - 6} ${head.y + 20}`); A.neck.setAttribute('stroke', col);
+  A.head.setAttribute('cx', head.x); A.head.setAttribute('cy', head.y); A.head.setAttribute('fill', col);
+  const u = 0.88, v = 1 - u;
+  const sh = {
+    x: v ** 3 * hip.x + 3 * v * v * u * c1.x + 3 * v * u * u * c2.x + u ** 3 * N.x,
+    y: v ** 3 * hip.y + 3 * v * v * u * c1.y + 3 * v * u * u * c2.y + u ** 3 * N.y,
+  };
+  A.arm.setAttribute('d', `M${sh.x} ${sh.y} L1420 700 L1540 648`);
+  // El muñeco se coloca abajo, centrado y más grande.
+  const k = 1.3;
+  A.fig.setAttribute('transform', `translate(${540 - 1540 * k} ${1560 - 700 * k}) scale(${k})`);
+  op(A.fig, seg(t, 1.2, 1.5));
+}
+
+// ------------------------------------------------------------------ escena B
+const B = {};
+{
+  const g = sc.b;
+  B.cap = text(g, 'MIDE', 540, 190, 190, 'disp', C.green);
+  B.phone = el('g', {}, g);
+  const p = B.phone;
+  el('rect', { x: 150, y: 250, width: 780, height: 1560, rx: 100, fill: '#0b0807', stroke: '#4a3a34', 'stroke-width': 10 }, p);
+  el('rect', { x: 470, y: 280, width: 140, height: 34, rx: 17, fill: '#000' }, p);
+  text(p, 'PostureFix', 220, 410, 66, 'sansb', C.ink, 'start');
+  B.sub = text(p, 'Vigilando · Sentado', 220, 464, 34, 'sans', C.dim, 'start');
+  B.ringBack = el('circle', { cx: 540, cy: 860, r: 250, fill: 'none', stroke: 'rgba(130,120,118,0.28)', 'stroke-width': 34 }, p);
+  B.arc = el('path', { fill: 'none', 'stroke-width': 34, 'stroke-linecap': 'round' }, p);
+  B.mark = el('line', { stroke: '#fff', 'stroke-width': 8, 'stroke-linecap': 'round' }, p);
+  B.num = text(p, '0°', 540, 925, 200, 'disp', C.ink);
+  B.numCap = text(p, 'de mala postura', 540, 995, 36, 'sans', C.dim);
+  B.pillBg = el('rect', { x: 280, y: 1130, width: 520, height: 88, rx: 44 }, p);
+  B.pillTx = text(p, 'Postura correcta', 540, 1190, 42, 'sansb', C.ink);
+  B.hint = text(p, 'Umbral 22° · la marca del anillo', 540, 1300, 32, 'sans', C.dimmer);
+  el('rect', { x: 220, y: 1480, width: 640, height: 120, rx: 60, fill: C.red }, p);
+  text(p, 'Parar vigilancia', 540, 1555, 48, 'sansb', '#fff');
+}
+const POINT = (cx, cy, r, frac) => { const a = -Math.PI / 2 + frac * Math.PI * 2; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+function updateB(t) {
+  op(sc.b, sceneAlpha(t, 2.4, 8.4, 0.15));
+  const pp = spring(seg(t, 2.4, 3.1));
+  op(B.phone, seg(t, 2.4, 2.6));
+  around(B.phone, 540, 1030, lerp(0.8, 1, pp));
+  B.phone.setAttribute('transform', B.phone.getAttribute('transform') + ` translate(0 ${(1 - pp) * 120})`);
+  // Titular que cambia a golpes.
+  const word = t < 4.4 ? 'MIDE' : t < 6.4 ? 'VIGILA' : 'AVISA';
+  const at = t < 4.4 ? 2.5 : t < 6.4 ? 4.4 : 6.4;
+  B.cap.textContent = word;
+  B.cap.setAttribute('fill', t < 4.4 ? C.green : t < 6.4 ? C.yellow : C.red);
+  slam(B.cap, t, at, 540, 120, 1.5);
+  const ang = easeInOut(seg(t, 3.6, 6.0)) * 36 + (t > 6.0 ? (smoothNoise(t * 3) - 0.5) * 2.4 : 0);
+  const frac = clamp(ang / 70), over = ang > 22;
+  const col = ang < 14 ? C.green : ang < 22 ? mix(C.green, C.yellow, (ang - 14) / 8) : mix(C.yellow, C.red, clamp((ang - 22) / 10));
+  const [x1, y1] = POINT(540, 860, 250, frac);
+  B.arc.setAttribute('stroke', col);
+  B.arc.setAttribute('d', frac < 0.002 ? '' : `M540 610 A250 250 0 ${frac > 0.5 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`);
+  const th = 22 / 70, [m1x, m1y] = POINT(540, 860, 226, th), [m2x, m2y] = POINT(540, 860, 282, th);
+  B.mark.setAttribute('x1', m1x); B.mark.setAttribute('y1', m1y); B.mark.setAttribute('x2', m2x); B.mark.setAttribute('y2', m2y);
+  B.num.textContent = `${Math.round(ang)}°`; B.num.setAttribute('fill', over ? col : C.ink);
+  B.pillBg.setAttribute('fill', over ? mix(C.red, '#000', 0.15) : mix(C.green, '#000', 0.55));
+  B.pillTx.textContent = over ? '¡Te estás agachando!' : 'Postura correcta';
+  B.sub.textContent = over ? 'Pitido en 4 s si no te enderezas' : 'Vigilando · Sentado';
+  const bump = over ? spring(seg(t, 4.9, 5.4)) : 1;
+  B.pillBg.setAttribute('transform', `translate(540 1174) scale(${over ? lerp(0.9, 1, bump) : 1}) translate(-540 -1174)`);
+}
+
+// ------------------------------------------------------------------ escena C
+const Cc = {};
+{
+  const g = sc.c;
+  Cc.bgRed = el('rect', { width: W, height: H, fill: C.red, opacity: 0 }, g);
+  Cc.bgGreen = el('rect', { width: W, height: H, fill: C.green, opacity: 0 }, g);
+  Cc.head = text(g, '1 · PITIDO', 540, 230, 100, 'disp', C.ink);
+  Cc.rings = [0, 1, 2, 3].map(() => el('circle', { cx: 540, cy: 960, r: 10, fill: 'none', stroke: C.yellow, 'stroke-width': 10, opacity: 0 }, g));
+  Cc.beep = text(g, 'PITIDO', 540, 1090, 330, 'disp', C.yellow);
+  Cc.beepSub = text(g, 'a los 4 s encorvado', 540, 1230, 54, 'sans', C.dim);
+  Cc.count = text(g, 'UNO', 540, 1160, 560, 'disp', C.ink);
+  Cc.a1 = text(g, '¡ENDEREZA', 540, 700, 230, 'disp', '#fff');
+  Cc.a2 = text(g, 'LA', 540, 1000, 300, 'disp', '#fff');
+  Cc.a3 = text(g, 'ESPALDA!', 540, 1280, 270, 'disp', '#fff');
+  Cc.eas = text(g, 'Tono EAS · 853 + 960 Hz', 540, 1560, 50, 'sansb', '#fff');
+  Cc.ok = text(g, 'BIEN.', 540, 1050, 420, 'disp', '#fff');
+  Cc.ok2 = text(g, 'Espalda recta.', 540, 1200, 90, 'sansb', '#fff');
+}
+function updateC(t) {
+  op(sc.c, sceneAlpha(t, 8.4, 15.0, 0.1));
+  const ph = t < 9.6 ? 0 : t < 12.0 ? 1 : t < 14.4 ? 2 : 3;
+  Cc.head.textContent = ['1 · PITIDO', '2 · CUENTA', '3 · ALARMA', '4 · RECUPERA'][ph];
+  Cc.head.setAttribute('fill', [C.yellow, C.orange, '#fff', '#fff'][ph]);
+  const beepOn = t >= 8.4 && t < 9.6;
+  op(Cc.beep, beepOn ? 1 : 0); op(Cc.beepSub, beepOn ? seg(t, 8.7, 9.0) : 0);
+  around(Cc.beep, 540, 960, 1 + (beepOn ? 0.1 * Math.max(0, 1 - ((t - 8.4) % 0.3) / 0.15) : 0));
+  Cc.rings.forEach((r, i) => {
+    const k = (t - (8.4 + i * 0.3)) / 0.8;
+    if (k < 0 || k > 1) { op(r, 0); return; }
+    r.setAttribute('r', (80 + easeOut(k) * 760).toFixed(1)); op(r, 0.85 * (1 - k));
+    r.setAttribute('stroke', i % 2 ? C.orange : C.yellow);
+  });
+  const words = ['UNO', 'DOS', 'TRES'], cols = [C.yellow, C.orange, C.red];
+  const ci = clamp(Math.floor((t - 9.6) / 0.8), 0, 2), counting = t >= 9.6 && t < 12.0;
+  Cc.count.textContent = words[ci]; Cc.count.setAttribute('fill', cols[ci]);
+  op(Cc.count, counting ? 1 : 0);
+  around(Cc.count, 540, 800, counting ? lerp(0.55, 1, spring(clamp(((t - 9.6) - ci * 0.8) / 0.4))) : 1);
+  const alarm = t >= 12.0 && t < 14.4;
+  const blink = 0.5 + 0.5 * Math.sin((t - 12.0) * 2 * Math.PI * 2.5), pulse = 1 + 0.03 * Math.sin((t - 12.0) * 2 * Math.PI * 2.5);
+  op(Cc.bgRed, alarm ? 0.35 + 0.45 * blink : 0);
+  [[Cc.a1, 600], [Cc.a2, 880], [Cc.a3, 1180]].forEach(([e, y], i) => {
+    op(e, alarm ? 1 : 0);
+    around(e, 540, y, alarm ? pulse * lerp(1.4, 1, spring(clamp((t - 12.0 - i * 0.08) / 0.3))) : 1);
+  });
+  op(Cc.eas, alarm ? seg(t, 12.4, 12.7) : 0);
+  const okOn = t >= 14.4;
+  op(Cc.bgGreen, okOn ? 0.5 : 0); op(Cc.ok, okOn ? 1 : 0); op(Cc.ok2, okOn ? seg(t, 14.55, 14.8) : 0);
+  around(Cc.ok, 540, 800, lerp(0.8, 1, spring(seg(t, 14.4, 14.9))));
+}
+
+// ------------------------------------------------------------------ escena D
+const D = {};
+{
+  const g = sc.d;
+  D.h1 = text(g, 'MÁS QUE', 540, 300, 170, 'disp', C.ink);
+  D.h2 = text(g, 'UN AVISO', 540, 470, 170, 'disp', C.orange);
+  const items = [
+    ['1', '3 perfiles', 'Sentado · De pie · En clase', C.orange],
+    ['2', 'Horario de vigilancia', 'Solo cuando tú quieres', C.green],
+    ['3', 'Recordatorio para levantarte', 'Cada 15 a 120 minutos', C.yellow],
+    ['4', 'Calibración en dos pasos', 'Distingue encorvarse de echarse atrás', C.red],
+  ];
+  D.cards = items.map(([n, title, sub, col], i) => {
+    const y = 600 + i * 285, row = el('g', {}, g);
+    el('rect', { x: 70, y, width: 940, height: 240, rx: 44, fill: 'rgba(255,255,255,0.06)', stroke: 'rgba(255,240,230,0.16)', 'stroke-width': 2 }, row);
+    el('circle', { cx: 170, cy: y + 120, r: 62, fill: col }, row);
+    text(row, n, 170, y + 150, 86, 'disp', '#1F0C02');
+    text(row, title, 270, y + 112, title.length > 24 ? 46 : 54, 'sansb', C.ink, 'start');
+    text(row, sub, 270, y + 170, 34, 'sans', C.dim, 'start');
+    return { row, at: 15.2 + i * 1.05 };
+  });
+}
+function updateD(t) {
+  op(sc.d, sceneAlpha(t, 15.0, 19.6, 0.2));
+  slam(D.h1, t, 15.0, 540, 230, 1.4); slam(D.h2, t, 15.25, 540, 400, 1.4);
+  D.cards.forEach((c) => {
+    const p = spring(seg(t, c.at, c.at + 0.55));
+    op(c.row, seg(t, c.at, c.at + 0.12));
+    c.row.setAttribute('transform', `translate(${(1 - p) * 1000} 0)`);
+  });
+}
+
+// ------------------------------------------------------------------ escena E
+const E = {};
+{
+  const g = sc.e;
+  E.halo = el('circle', { cx: 540, cy: 520, r: 620, fill: 'url(#glowO)', opacity: 0.8 }, g);
+  E.icon = el('g', {}, g);
+  el('rect', { width: 220, height: 220, rx: 52, fill: '#0a0706', stroke: 'rgba(255,240,230,0.2)', 'stroke-width': 3 }, E.icon);
+  el('circle', { cx: 82, cy: 70, r: 23, fill: C.orange }, E.icon);
+  el('path', { d: 'M80 98 C65 126 83 146 107 156', stroke: C.orange, 'stroke-width': 21, fill: 'none', 'stroke-linecap': 'round' }, E.icon);
+  el('path', { d: 'M103 157 H158', stroke: C.orange, 'stroke-width': 21, fill: 'none', 'stroke-linecap': 'round' }, E.icon);
+  E.name = text(g, 'PostureFix', 540, 640, 210, 'disp', C.ink);
+  E.ver = el('g', {}, g);
+  el('rect', { x: 470, y: 680, width: 140, height: 64, rx: 32, fill: C.orange }, E.ver);
+  text(E.ver, '2.1', 540, 726, 40, 'sansb', '#1F0C02');
+  E.l1 = text(g, 'Android · Windows · Linux · Web', 540, 840, 44, 'sansb', C.ink);
+  E.l2 = text(g, 'Gratis · Sin cuentas', 540, 900, 38, 'sans', C.dim);
+  E.qr = el('g', {}, g);
+  el('rect', { x: 330, y: 970, width: 420, height: 420, rx: 28, fill: '#fff' }, E.qr);
+  const n = Number(/viewBox="0 0 (\d+) /.exec(QR_SVG)[1]);
+  const holder = el('g', { transform: `translate(358 998) scale(${364 / n})` }, E.qr);
+  el('path', { d: /<path stroke="[^"]*" d="([^"]+)"/.exec(QR_SVG)[1], stroke: '#0a0706', fill: 'none', 'shape-rendering': 'crispEdges' }, holder);
+  E.cap = text(g, 'ESCANÉALO', 540, 1500, 100, 'disp', C.ink);
+  E.url = text(g, 'github.com/agus-blackops/PostureFix', 540, 1560, 32, 'sans', C.dim);
+  E.fair = text(g, 'Proyecto para la feria de ciencias', 540, 1760, 42, 'sansb', C.orange2);
+}
+function updateE(t) {
+  op(sc.e, sceneAlpha(t, 19.6, 24, 0.15));
+  op(E.icon, seg(t, 19.6, 19.8));
+  E.icon.setAttribute('transform', `translate(430 240) ` + `scale(${lerp(0.6, 1, spring(seg(t, 19.6, 20.3)))})`);
+  slam(E.name, t, 19.8, 540, 540, 1.35); reveal(E.ver, t, 20.2, 0.4);
+  reveal(E.l1, t, 20.7); reveal(E.l2, t, 21.0);
+  const qp = spring(seg(t, 21.3, 22.0));
+  op(E.qr, seg(t, 21.3, 21.5));
+  E.qr.setAttribute('transform', `translate(540 1180) scale(${lerp(0.7, 1, qp)}) translate(-540 -1180)`);
+  reveal(E.cap, t, 21.8); reveal(E.url, t, 22.1); reveal(E.fair, t, 22.5);
+}
+
+// -------------------------------------------------------------------- tiempo
+function setT(t) {
+  t = clamp(t, 0, DURATION);
+  updateA(t); updateB(t); updateC(t); updateD(t); updateE(t);
+  const alarm = t >= 12.0 && t < 14.4;
+  op(glow1, 0.55 - 0.25 * seg(t, 8.4, 9.6) + 0.2 * seg(t, 15, 15.4));
+  op(glow2, 0.35 + 0.5 * seg(t, 4.6, 8.4) * (1 - seg(t, 8.4, 8.5)) + (alarm ? 0.5 : 0));
+  let f = 0, sx = 0, sy = 0;
+  const hit = (t0, power, dur = 0.4) => {
+    const k = (t - t0) / dur;
+    if (k < 0 || k > 1) return;
+    f = Math.max(f, power * (1 - k) * (1 - k));
+    const a = power * 22 * (1 - k) * (1 - k);
+    sx += Math.sin(t * 90) * a; sy += Math.cos(t * 77) * a;
+  };
+  [0.0, 0.35, 0.7, 1.05].forEach((x) => hit(x, 0.12, 0.2));
+  hit(2.4, 0.5, 0.4); hit(8.4, 0.3, 0.2); hit(12.0, 0.5, 0.4); hit(14.4, 0.45, 0.4); hit(19.6, 0.6, 0.5);
+  op(flash, f); stage.setAttribute('transform', `translate(${sx.toFixed(2)} ${sy.toFixed(2)})`);
+  op(fade, Math.max(1 - seg(t, 0, 0.15), seg(t, 23.3, 24)));
+}
+window.setT = setT;
+window.DURATION = DURATION;
+function fit() {
+  const k = Math.min(innerWidth / W, innerHeight / H);
+  document.getElementById('wrap').style.transform = `translate(-50%, -50%) scale(${k})`;
+}
+addEventListener('resize', fit); fit();
+setT(0);
+if (!location.search.includes('manual')) {
+  const hint = document.createElement('div');
+  hint.textContent = 'Pulsa para ver el tráiler';
+  hint.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:600 28px Inter,sans-serif;background:rgba(0,0,0,.6);cursor:pointer';
+  document.body.appendChild(hint);
+  hint.addEventListener('click', () => {
+    hint.remove();
+    const t0 = performance.now();
+    (function loop() { const t = (performance.now() - t0) / 1000; setT(t); if (t < DURATION) requestAnimationFrame(loop); })();
+  });
+}
+</script>
+</body>
+</html>

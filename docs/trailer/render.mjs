@@ -18,10 +18,13 @@ import { createRequire } from 'node:module';
 const here = dirname(fileURLToPath(import.meta.url));
 const [, , workDir = join(here, 'build'), ffmpeg = 'ffmpeg', chromium] = process.argv;
 const FPS = 30;
+// TRAILER=trailer2 SIZE=1080x1920 saca la versión vertical; por defecto, el tráiler 1.
+const NAME = process.env.TRAILER || 'trailer';
+const [VW, VH] = (process.env.SIZE || '1920x1080').split('x').map(Number);
 const require = createRequire(process.env.NODE_PATH ? join(process.env.NODE_PATH, 'x.js') : import.meta.url);
 const { chromium: pw } = require('playwright-core');
 
-const frames = join(workDir, 'frames');
+const frames = join(workDir, `frames-${NAME}`);
 // SOLO_VIDEO=1 reutiliza los fotogramas de una pasada anterior (para cambiar el audio).
 const reuse = process.env.SOLO_VIDEO === '1' && existsSync(join(frames, 'f00000.jpg'));
 if (!reuse) {
@@ -30,8 +33,8 @@ if (!reuse) {
 }
 
 const browser = await pw.launch({ executablePath: chromium || undefined });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-await page.goto('file://' + join(here, 'trailer.html') + '?manual');
+const page = await browser.newPage({ viewport: { width: VW, height: VH } });
+await page.goto('file://' + join(here, `${NAME}.html`) + '?manual');
 await page.evaluate(() => document.fonts.ready);
 const total = await page.evaluate(() => window.DURATION);
 const count = Math.round(total * FPS);
@@ -42,8 +45,8 @@ for (let i = 0; i < (reuse ? 0 : count); i++) {
 }
 await browser.close();
 
-const audio = join(workDir, 'audio.wav');
-const out = join(here, 'PostureFix-trailer.mp4');
+const audio = join(workDir, `${NAME}.wav`);
+const out = join(here, NAME === 'trailer' ? 'PostureFix-trailer.mp4' : `PostureFix-${NAME}.mp4`);
 const args = [
   '-y', '-framerate', String(FPS), '-i', join(frames, 'f%05d.jpg'),
   ...(existsSync(audio) ? ['-i', audio, '-c:a', 'aac', '-b:a', '192k'] : []),
