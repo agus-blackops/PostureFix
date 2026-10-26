@@ -36,8 +36,39 @@ async function resolveModelUrl(quality: ModelQuality): Promise<string> {
 }
 
 /**
- * Carga MediaPipe Pose. Intenta primero con GPU y cae a CPU en los portátiles
- * cuyo navegador no expone WebGL a WASM.
+ * La GPU ya falló en este equipo: los detectores siguientes van por CPU. Pasa
+ * en portátiles sin aceleración gráfica o con el controlador en la lista negra
+ * del navegador: el detector de GPU se crea sin quejarse, pero luego falla en
+ * cada fotograma y nunca ve a nadie.
+ */
+let gpuBroken = false;
+
+/** Marca la GPU como rota (lo usa el bucle cuando la detección falla seguida). */
+export function markGpuBroken(): void {
+  gpuBroken = true;
+}
+
+export function usingCpu(): boolean {
+  return gpuBroken;
+}
+
+/** Prueba un detector con una imagen en blanco: si la GPU no sirve, falla aquí. */
+function works(landmarker: PoseLandmarker): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    canvas.getContext('2d')?.fillRect(0, 0, 64, 64);
+    landmarker.detectForVideo(canvas, 1);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Carga MediaPipe Pose. Intenta primero con GPU, comprueba que de verdad
+ * funciona, y si no, usa la CPU.
  */
 export async function createPoseLandmarker(
   log: (message: string) => void,
@@ -59,12 +90,18 @@ export async function createPoseLandmarker(
     numPoses: 3,
   });
 
-  try {
-    return await PoseLandmarker.createFromOptions(vision, options('GPU'));
-  } catch {
-    log('Sin GPU disponible, usando CPU…');
-    return PoseLandmarker.createFromOptions(vision, options('CPU'));
+  if (!gpuBroken) {
+    try {
+      const gpu = await PoseLandmarker.createFromOptions(vision, options('GPU'));
+      if (works(gpu)) return gpu;
+      gpu.close();
+    } catch {
+      // Sin WebGL: a la CPU.
+    }
+    gpuBroken = true;
+    log('La tarjeta gráfica no sirve para el detector; uso el procesador…');
   }
+  return PoseLandmarker.createFromOptions(vision, options('CPU'));
 }
 
 /** Las cámaras que ve el sistema. Sin permiso todavía, sin nombres. */

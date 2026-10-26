@@ -38,7 +38,7 @@ import { WebAlerts } from './alerts';
 import { cameraErrorHelp } from './cameraError';
 import { cameraLabel, isInfraredCamera, type CameraInfo } from './cameraPlan';
 import { LoadingIndicator, MorphingShape, WavyRing, installMotionTokens } from './expressive';
-import { createPoseLandmarker, listCameras, startCamera, stopCamera, type ModelQuality } from './detector';
+import { createPoseLandmarker, listCameras, markGpuBroken, startCamera, stopCamera, usingCpu, type ModelQuality } from './detector';
 import {
   CAUSE_LABEL,
   METRIC_KEYS,
@@ -294,9 +294,45 @@ function readPose(nowMs: number): { metrics: PostureMetrics | null; landmarks: L
     return { metrics: null, landmarks: null };
   }
   lastVideoTime = ui.video.currentTime;
-  const result = landmarker.detectForVideo(ui.video, nowMs);
+  let result: ReturnType<PoseLandmarker['detectForVideo']>;
+  try {
+    result = landmarker.detectForVideo(ui.video, nowMs);
+    detectFailures = 0;
+  } catch {
+    onDetectFailure();
+    return { metrics: null, landmarks: null };
+  }
   const subject = selectSubject(result.landmarks as Landmark[][] | undefined);
   return { metrics: subject?.metrics ?? null, landmarks: subject?.landmarks ?? null };
+}
+
+/** Fotogramas seguidos en los que el detector ha fallado. */
+let detectFailures = 0;
+let switchingToCpu = false;
+
+/**
+ * Si el detector falla varios fotogramas seguidos, casi siempre es la GPU: se
+ * rehace por CPU sin parar la vigilancia. Antes fallaba en silencio y la app
+ * nunca veía a nadie.
+ */
+function onDetectFailure(): void {
+  detectFailures += 1;
+  if (detectFailures < 5 || switchingToCpu || usingCpu()) return;
+  switchingToCpu = true;
+  markGpuBroken();
+  setStatus('El detector falla con la tarjeta gráfica; cambiando al procesador…');
+  createPoseLandmarker(setStatus, settings.modelQuality)
+    .then((cpu) => {
+      const previous = landmarker;
+      landmarker = cpu;
+      previous?.close();
+      detectFailures = 0;
+      setStatus('Detector listo (por procesador).');
+    })
+    .catch((error) => setStatus(`No se pudo cargar el detector: ${(error as Error).message}`))
+    .finally(() => {
+      switchingToCpu = false;
+    });
 }
 
 function tick(): void {
