@@ -32,7 +32,7 @@
  * Igual que los otros, es una función del tiempo, `setT(t)`: el lienzo `#gl`
  * lleva lo 3D, los SVG (debajo y encima) llevan el fondo y los textos.
  */
-const W = 1920, H = 1080, DURATION = 91;
+const W = 1920, H = 1080, DURATION = 103;
 const C = {
   bg: '#0A0706', orange: '#FF7A29', orange2: '#FF8A45', red: '#FF453A',
   green: '#30D158', yellow: '#FFD60A', ink: '#FFFFFF',
@@ -588,9 +588,14 @@ function updateT(t) {
 
 // ------------------------------------------------------- la pelea (3D + marcadores)
 const OF = {};
-const FIGHT0 = 71.0;
+const FIGHT0 = 71.0, FIGHT1 = 97.0;
 {
   const g = scenes.fight;
+  OF.speed = el('g', {}, g);
+  OF.lines = Array.from({ length: 44 }, (_, i) => {
+    const a = (i / 44) * Math.PI * 2 + noise(i) * 0.1, r0 = 380 + noise(i * 3) * 200, r1 = 1250 + noise(i * 7) * 400;
+    return el('line', { x1: 960 + Math.cos(a) * r0, y1: 540 + Math.sin(a) * r0 * 0.62, x2: 960 + Math.cos(a) * r1, y2: 540 + Math.sin(a) * r1 * 0.62, stroke: '#fff', 'stroke-width': 3 + noise(i * 11) * 7, 'stroke-linecap': 'round' }, OF.speed);
+  });
   OF.hud = el('g', {}, g);
   OF.nameO = text(OF.hud, 'HORNO BÁSICO', 120, 72, 46, 'disp', C.ink, 'start');
   OF.nameH = text(OF.hud, 'POSTUREFIX', 1800, 72, 46, 'disp', C.orange, 'end');
@@ -599,42 +604,62 @@ const FIGHT0 = 71.0;
   el('rect', { x: 1100, y: 90, width: 700, height: 38, rx: 19, fill: 'rgba(255,255,255,0.12)' }, OF.hud);
   OF.barH = el('rect', { x: 1100, y: 90, width: 700, height: 38, rx: 19, fill: C.green }, OF.hud);
   OF.vs = text(OF.hud, 'VS', 960, 128, 76, 'disp', C.ink, 'middle');
-  OF.round = text(g, 'RONDA 1', 960, 560, 250, 'disp', C.ink, 'middle');
+  OF.status = text(OF.hud, 'ENCORVADO', 1800, 172, 44, 'sansb', C.red, 'end');
+  OF.rage = text(OF.hud, 'SOBRECALENTADO', 120, 172, 44, 'sansb', C.orange, 'start');
+  OF.nO = text(g, 'HORNO BÁSICO', 480, 880, 150, 'disp', C.red, 'middle');
+  OF.nH = text(g, 'POSTUREFIX', 1440, 880, 150, 'disp', C.orange, 'middle');
+  OF.round = text(g, 'RONDA FINAL', 960, 560, 250, 'disp', C.ink, 'middle');
   OF.go = text(g, '¡PELEA!', 960, 620, 340, 'disp', C.orange, 'middle');
   OF.pops = [
-    ['¡PUÑO CALIENTE!', 2.4, 'oven', C.red], ['PITIDO', 3.4, 'hero', C.yellow], ['¡CALOR!', 4.7, 'oven', C.red],
-    ['UNO', 5.8, 'hero', C.yellow], ['DOS', 6.3, 'hero', C.orange2], ['TRES', 6.8, 'hero', C.red],
-    ['¡LLAMARADA!', 8.0, 'oven', C.red], ['¡ALARMA EAS!', 9.4, 'hero', '#ffffff'],
-  ].map(([label, at, who, fill]) => ({ at, who, e: text(g, label, 0, 0, 84, 'disp', fill, 'middle') }));
+    ['¡PUÑO CALIENTE!', 3.8, 'oven', C.red, 84], ['PITIDO', 4.8, 'hero', C.yellow, 84], ['¡CALOR!', 6.0, 'oven', C.red, 84],
+    ['UNO', 7.4, 'hero', C.yellow, 90], ['DOS', 7.9, 'hero', C.orange2, 100], ['TRES', 8.4, 'hero', C.red, 112],
+    ['¡SOBRECALENTADO!', 9.4, 'oven', C.red, 96], ['¡MEGA LLAMARADA!', 10.9, 'oven', C.red, 96], ['¡PISOTÓN!', 12.4, 'oven', C.red, 100],
+    ['¡ZAS!', 16.9, 'oven', C.yellow, 110], ['¡ZAS!', 17.1, 'oven', C.orange2, 120], ['¡ZAS!', 17.3, 'oven', C.red, 130],
+    ['¡ALARMA EAS!', 18.6, 'hero', '#ffffff', 100],
+  ].map(([label, at, who, fill, size]) => ({ at, who, e: text(g, label, 0, 0, size, 'disp', fill, 'middle') }));
+  OF.tired = text(g, 'TE ESTÁS ENCORVANDO…', 960, 880, 110, 'disp', 'rgba(255,255,255,0.8)', 'middle');
+  OF.straight = text(g, '¡ENDEREZA LA ESPALDA!', 960, 540, 170, 'disp', C.ink, 'middle');
   OF.ko = text(g, 'K.O.', 960, 700, 560, 'disp', C.red, 'middle');
   OF.win = text(g, 'POSTUREFIX GANA', 960, 900, 150, 'disp', C.ink, 'middle');
   OF.joke = text(g, 'Es una broma: ¡suerte a todos!', 960, 1000, 46, 'sans', C.dim, 'middle');
 }
 function updateFight(t) {
   const f = t - FIGHT0;
-  op(scenes.fight, sceneAlpha(t, FIGHT0, 85, 0.3));
+  op(scenes.fight, sceneAlpha(t, FIGHT0, FIGHT1, 0.3));
   const hpO = (T3.screen.hpOven || [100])[0], hpH = (T3.screen.hpHero || [100])[0];
   OF.barO.setAttribute('width', (7 * hpO).toFixed(1));
   OF.barH.setAttribute('x', (1100 + 7 * (100 - hpH)).toFixed(1)); OF.barH.setAttribute('width', (7 * hpH).toFixed(1));
   OF.barO.setAttribute('fill', hpO < 30 ? C.yellow : C.red);
-  OF.barH.setAttribute('fill', hpH < 30 ? C.yellow : C.green);
+  const low = hpH < 20;
+  OF.barH.setAttribute('fill', low ? (Math.floor(f * 6) % 2 ? C.red : '#7a1812') : hpH < 40 ? C.yellow : C.green);
   op(OF.hud, seg(f, 0.3, 0.8));
-  const r = seg(f, 0.5, 0.6) * (1 - seg(f, 1.3, 1.5));
-  op(OF.round, r); around(OF.round, 960, 470, lerp(1.4, 1, spring(seg(f, 0.5, 0.9))));
-  const go = seg(f, 1.5, 1.6) * (1 - seg(f, 2.2, 2.4));
-  op(OF.go, go); around(OF.go, 960, 500, lerp(1.5, 1, spring(seg(f, 1.5, 1.9))));
+  op(OF.status, f >= 11.7 && f < 15.3 ? (Math.floor(f * 4) % 2 ? 1 : 0.4) : 0);
+  op(OF.rage, f >= 9.4 && f < 20.1 ? 1 : 0);
+  // Presentación de los dos.
+  op(OF.nO, seg(f, 0.8, 0.9) * (1 - seg(f, 2.0, 2.2))); around(OF.nO, 480, 820, lerp(1.5, 1, spring(seg(f, 0.8, 1.2))));
+  op(OF.nH, seg(f, 1.4, 1.5) * (1 - seg(f, 2.0, 2.2))); around(OF.nH, 1440, 820, lerp(1.5, 1, spring(seg(f, 1.4, 1.8))));
+  const r = seg(f, 2.4, 2.5) * (1 - seg(f, 3.0, 3.2));
+  op(OF.round, r); around(OF.round, 960, 470, lerp(1.4, 1, spring(seg(f, 2.4, 2.8))));
+  const go = seg(f, 3.2, 3.3) * (1 - seg(f, 3.9, 4.1));
+  op(OF.go, go); around(OF.go, 960, 500, lerp(1.5, 1, spring(seg(f, 3.2, 3.6))));
   OF.pops.forEach((p) => {
     const k = seg(f, p.at, p.at + 0.9);
     const pos = (p.who === 'oven' ? T3.screen.oven : T3.screen.hero) || [960, 300];
     op(p.e, k > 0 && k < 1 ? Math.min(1, (1 - k) * 3) : 0);
-    // El texto sale hacia el centro de la arena, para no tapar a nadie ni a las barras.
-    const px = pos[0] + (p.who === 'oven' ? 330 : -330), py = pos[1] + 80 - 40 * k;
+    const px = clamp(pos[0] + (p.who === 'oven' ? 330 : -330), 300, 1620), py = clamp(pos[1] + 80 - 40 * k, 330, 700);
     p.e.setAttribute('x', px); p.e.setAttribute('y', py);
     around(p.e, px, py - 30, lerp(1.6, 1, spring(clamp(k * 3))));
   });
-  const ko = seg(f, 10.3, 10.4) * (1 - seg(f, 11.2, 11.7));
-  op(OF.ko, ko); around(OF.ko, 960, 480, lerp(2.0, 1, spring(seg(f, 10.3, 10.8))));
-  reveal(OF.win, t, FIGHT0 + 11.8, 0.5, 40); reveal(OF.joke, t, FIGHT0 + 12.7, 0.5, 20);
+  op(OF.tired, f >= 13.5 && f < 15.2 ? Math.min(1, seg(f, 13.5, 14.0)) * (0.6 + 0.4 * Math.sin(f * 7)) : 0);
+  const st = seg(f, 15.2, 15.3) * (1 - seg(f, 16.0, 16.4));
+  op(OF.straight, st); around(OF.straight, 960, 440, lerp(1.7, 1, spring(seg(f, 15.2, 15.7))));
+  const ko = seg(f, 20.1, 20.2) * (1 - seg(f, 21.2, 21.7));
+  op(OF.ko, ko); around(OF.ko, 960, 480, lerp(2.2, 1, spring(seg(f, 20.1, 20.7))));
+  reveal(OF.win, t, FIGHT0 + 22.4, 0.5, 40); reveal(OF.joke, t, FIGHT0 + 24.0, 0.5, 20);
+  // Líneas de velocidad.
+  const sp = (T3.screen.speed || [0])[0];
+  op(OF.speed, sp * 0.7);
+  OF.lines.forEach((l, i) => l.setAttribute('transform', `translate(${(noise(i + Math.floor(f * 20)) - 0.5) * 24} 0)`));
 }
 
 // -------------------------------------------------------------------- tiempo
@@ -643,7 +668,7 @@ function setT(t) {
   T3.render(t);
   updateA(t); updateB(t); updateC(t); updateD(t);
   updateS4(t - 2); updateS5(t - 17.5); updateS6(t - 17.5);
-  updateF(t); updateT(t); updateFight(t); updateS7(t - 43);
+  updateF(t); updateT(t); updateFight(t); updateS7(t - 55);
   const alarm = t >= 28.8 && t < 31.6;
   op(glow1, 0.55 - 0.25 * seg(t, 23, 26) + 0.2 * seg(t, 32.5, 33));
   op(glow2, 0.3 + 0.5 * seg(t, 18.8, 23) * (1 - seg(t, 23, 23.2)) + (alarm ? 0.5 : 0));
@@ -656,10 +681,10 @@ function setT(t) {
     sx += Math.sin(t * 90) * a; sy += Math.cos(t * 77) * a;
   };
   hit(7.0, 0.9, 0.6); hit(23.5, 0.25, 0.2); hit(28.8, 0.5, 0.4); hit(31.6, 0.45, 0.5); hit(69.8, 0.35, 0.4); hit(71.0, 0.5, 0.5);
-  [3.65, 5.3, 6.05, 6.55, 7.05, 8.9].forEach((x) => hit(FIGHT0 + x, 0.18, 0.2));
-  hit(FIGHT0 + 10.3, 0.9, 0.6); hit(85.0, 0.5, 0.5);
+  [5.05, 6.7, 7.65, 8.15, 8.65, 11.6, 13.0, 16.9, 17.1, 17.3].forEach((x) => hit(FIGHT0 + x, 0.2, 0.2));
+  hit(FIGHT0 + 9.3, 0.45, 0.5); hit(FIGHT0 + 12.4, 0.4, 0.4); hit(FIGHT0 + 15.3, 0.7, 0.6); hit(FIGHT0 + 20.1, 1.0, 0.7); hit(FIGHT1, 0.5, 0.5);
   op(flash, f); shake.style.transform = `translate(${sx.toFixed(2)}px, ${sy.toFixed(2)}px)`;
-  op(fade, Math.max(1 - seg(t, 0, 0.8), seg(t, 90.1, 91)));
+  op(fade, Math.max(1 - seg(t, 0, 0.8), seg(t, 102.1, 103)));
 }
 window.setT = setT;
 window.DURATION = DURATION;

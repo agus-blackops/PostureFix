@@ -422,37 +422,76 @@ function buildD() {
   };
 }
 
-// ============================================================ F: la pelea
+// ============================================================ F: la pelea (épica)
 /** 0 → 1 → 0 en `dur` segundos desde `t0`. */
 const bump = (f, t0, dur) => Math.sin(Math.PI * seg(f, t0, t0 + dur));
+const smooth = (x) => x * x * (3 - 2 * x);
+
+/** Planos de cámara: [segundo, posición, hacia dónde mira]. Entre uno y otro se desliza. */
+const SHOTS = [
+  [0.0, [-1.5, 0.6, 8.5], [0, 1.5, 0]],
+  [2.3, [0.5, 1.3, 8.0], [0, 1.3, 0]],
+  [3.2, [0, 2.0, 7.6], [0, 1.1, 0]],
+  [4.7, [0, 2.0, 7.4], [0, 1.1, 0]],
+  [4.95, [-1.0, 1.5, 5.0], [-1.2, 1.25, 0]],
+  [5.6, [-0.5, 1.8, 6.5], [0, 1.1, 0]],
+  [6.45, [1.0, 1.5, 5.2], [1.2, 1.3, 0]],
+  [7.2, [0, 2.0, 7.4], [0, 1.1, 0]],
+  [7.5, [-0.8, 1.4, 5.2], [-1.2, 1.2, 0]],
+  [8.8, [-0.8, 1.4, 5.2], [-1.2, 1.2, 0]],
+  [9.3, [0, 0.8, 7.0], [-1.0, 1.6, 0]],
+  [10.6, [0, 0.8, 6.2], [-1.2, 1.7, 0]],
+  [11.4, [0.4, 1.5, 6.0], [0.8, 1.3, 0]],
+  [12.8, [0.8, 1.4, 5.0], [1.3, 1.0, 0]],
+  [14.4, [1.2, 1.2, 3.8], [1.5, 1.1, 0]],
+  [15.1, [1.2, 1.2, 3.6], [1.5, 1.2, 0]],
+  [15.6, [0, 1.0, 6.0], [1.0, 1.4, 0]],
+  [16.5, [0, 1.6, 7.0], [0, 1.2, 0]],
+  [17.4, [-0.6, 1.6, 5.4], [-1.0, 1.2, 0]],
+  [18.0, [0.5, 0.6, 5.0], [1.0, 1.5, 0]],
+  [19.5, [0, 1.4, 7.4], [0, 1.2, 0]],
+  [20.2, [-1, 1.6, 5.6], [-1.5, 1.4, 0]],
+  [21.5, [-3, 2.5, 6.5], [-4.5, 3.0, 0]],
+  [22.5, [0, 1.8, 7.0], [1.5, 1.4, 0]],
+  [26.0, [0, 1.6, 7.8], [1.8, 1.4, 0]],
+];
+
+const OVEN_HITS = [[5.05, 16], [7.65, 14], [8.15, 14], [8.65, 14], [16.9, 12], [17.1, 12], [17.3, 10], [20.1, 8]];
+const HERO_HITS = [[6.7, 12, 0.25], [11.6, 48, 0.3], [13.0, 32, 0.3], [15.4, -30, 0.9]];
+const HERO_JABS = [4.8, 7.4, 7.9, 8.4];
+const hpOf = (hits, f) => 100 - hits.reduce((s, [t, d, dur = 0.25]) => s + d * easeOut(seg(f, t, t + dur)), 0);
 
 function buildF() {
   const scene = new THREE.Scene();
   env(scene);
-  scene.fog = new THREE.Fog(0x0a0706, 9, 20);
-  const arena = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 0.06, 72), new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.85 }));
+  scene.fog = new THREE.Fog(0x0a0706, 9, 22);
+  const arena = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 0.06, 72), new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.85 }));
   arena.position.y = -0.04; scene.add(arena);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.045, 8, 120), new THREE.MeshStandardMaterial({ color: C.orange, emissive: C.orange, emissiveIntensity: 0.9 }));
+  const rimMat = new THREE.MeshStandardMaterial({ color: C.orange, emissive: C.orange, emissiveIntensity: 0.9 });
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.045, 8, 120), rimMat);
   rim.rotation.x = Math.PI / 2; scene.add(rim);
+  // Relámpagos: una luz que se dispara.
+  const bolt = new THREE.PointLight(0xbfd8ff, 0, 40, 1.4); bolt.position.set(0, 7, 3); scene.add(bolt);
+  const stageLight = new THREE.SpotLight(0xffe0c0, 0, 30, 0.45, 0.5, 1); stageLight.position.set(1.5, 9, 3); stageLight.target.position.set(1.5, 0, 0); scene.add(stageLight, stageLight.target);
 
   const glove = (color) => new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 16), new THREE.MeshStandardMaterial({ color, roughness: 0.45 }));
   const hose = (color) => cylinder(0.07, new THREE.MeshStandardMaterial({ color, roughness: 0.6 }), 12);
 
   // ------------------------------------------------ el horno
-  const ovenRoot = new THREE.Group(); scene.add(ovenRoot);   // posición y caída
+  const ovenRoot = new THREE.Group(); scene.add(ovenRoot);
   const ovenYaw = new THREE.Group(); ovenYaw.rotation.y = 0.6; ovenRoot.add(ovenYaw);
-  const steel = new THREE.MeshStandardMaterial({ color: 0x9a9aa4, metalness: 0.55, roughness: 0.35 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x9a9aa4, metalness: 0.55, roughness: 0.35, emissive: 0xff2200, emissiveIntensity: 0 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.6 });
-  const shell = new THREE.Mesh(new RoundedBoxGeometry(1.35, 1.5, 1.0, 5, 0.08), steel); shell.position.y = 1.05; ovenYaw.add(shell);
+  const shell = new THREE.Mesh(new RoundedBoxGeometry(1.35, 1.5, 1.0, 5, 0.08), steelMat); shell.position.y = 1.05; ovenYaw.add(shell);
   const panel = new THREE.Mesh(new RoundedBoxGeometry(1.25, 0.38, 0.05, 4, 0.03), dark); panel.position.set(0, 1.58, 0.51); ovenYaw.add(panel);
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, emissive: 0xff2a00, emissiveIntensity: 0 });
   const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 });
   const eyes = [-0.3, 0.3].map((x) => {
     const e = new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 16), eyeMat); e.scale.z = 0.5; e.position.set(x, 1.58, 0.56);
     const p = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 10), pupilMat); p.position.set(x + 0.04, 1.58, 0.62);
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.05), dark); b.position.set(x, 1.79, 0.56); b.rotation.z = x < 0 ? -0.42 : 0.42;
     ovenYaw.add(e, p, b);
-    return { e, p, b };
+    return { e, p, b, x };
   });
   [-0.56, 0.56].forEach((x) => {
     const k = cylinder(0.075, new THREE.MeshStandardMaterial({ color: 0x5a5a62, metalness: 0.6, roughness: 0.3 }), 16);
@@ -461,7 +500,7 @@ function buildF() {
   const inside = new THREE.Mesh(new RoundedBoxGeometry(1.1, 0.88, 0.04, 3, 0.02), new THREE.MeshStandardMaterial({ color: 0x120a07, emissive: 0xff5a1a, emissiveIntensity: 0.25 }));
   inside.position.set(0, 0.88, 0.505); ovenYaw.add(inside);
   const doorPivot = new THREE.Group(); doorPivot.position.set(0, 0.42, 0.52); ovenYaw.add(doorPivot);
-  const door = new THREE.Mesh(new RoundedBoxGeometry(1.16, 0.84, 0.07, 4, 0.03), steel); door.position.y = 0.44; doorPivot.add(door);
+  const door = new THREE.Mesh(new RoundedBoxGeometry(1.16, 0.84, 0.07, 4, 0.03), steelMat); door.position.y = 0.44; doorPivot.add(door);
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x1a0d08, emissive: 0xff5a1a, emissiveIntensity: 0.4, roughness: 0.2 });
   const glass = new THREE.Mesh(new RoundedBoxGeometry(0.9, 0.5, 0.03, 3, 0.02), glassMat); glass.position.set(0, 0.4, 0.05); doorPivot.add(glass);
   const handle = cylinder(0.03, dark, 10); handle.rotation.z = Math.PI / 2; handle.scale.set(1, 0.8, 1); handle.position.set(0, 0.78, 0.1); doorPivot.add(handle);
@@ -471,186 +510,317 @@ function buildF() {
   });
   const ovenArms = [{ s: new THREE.Vector3(0.74, 1.15, 0.1), g: glove(0xd0211a), h: hose(0x7a7a84) }, { s: new THREE.Vector3(-0.74, 1.15, 0.1), g: glove(0xd0211a), h: hose(0x7a7a84) }];
   ovenArms.forEach((a) => ovenYaw.add(a.g, a.h));
+  const ovenGlow = new THREE.PointLight(0xff3a10, 0, 7, 2); ovenGlow.position.set(0, 1.2, 1.2); ovenYaw.add(ovenGlow);
 
   // ------------------------------------------------ PostureFix
   const heroRoot = new THREE.Group(); scene.add(heroRoot);
   const heroYaw = new THREE.Group(); heroYaw.rotation.y = -0.6; heroRoot.add(heroYaw);
+  const heroUpper = new THREE.Group(); heroUpper.position.set(0, 0.6, 0); heroYaw.add(heroUpper); // se dobla por la cintura
   const faceCv = document.createElement('canvas'); faceCv.width = 256; faceCv.height = 512;
   const fg = faceCv.getContext('2d');
   const faceTex = new THREE.CanvasTexture(faceCv); faceTex.colorSpace = THREE.SRGBColorSpace;
-  const phoneBody = new THREE.Mesh(new RoundedBoxGeometry(0.86, 1.5, 0.14, 6, 0.09), new THREE.MeshStandardMaterial({ color: 0x1d1512, roughness: 0.3, metalness: 0.6, emissive: 0x2a1308, emissiveIntensity: 0.5 }));
-  phoneBody.position.y = 1.3; heroYaw.add(phoneBody);
+  const phoneBody = new THREE.Mesh(new RoundedBoxGeometry(0.86, 1.5, 0.14, 6, 0.09), new THREE.MeshStandardMaterial({ color: 0x1d1512, roughness: 0.3, metalness: 0.6, emissive: 0xff7a29, emissiveIntensity: 0.15 }));
+  phoneBody.position.y = 0.7; heroUpper.add(phoneBody);
   const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.76, 1.4), new THREE.MeshBasicMaterial({ map: faceTex, toneMapped: false }));
-  faceMesh.position.set(0, 1.3, 0.076); heroYaw.add(faceMesh);
+  faceMesh.position.set(0, 0.7, 0.076); heroUpper.add(faceMesh);
   const orangeMat = new THREE.MeshStandardMaterial({ color: C.orange, emissive: C.orange, emissiveIntensity: 0.3, roughness: 0.5 });
   [-0.22, 0.22].forEach((x) => {
     const leg = cylinder(0.075, orangeMat, 12); setLimb(leg, new THREE.Vector3(x, 0.56, 0), new THREE.Vector3(x, 0.1, 0)); heroYaw.add(leg);
     const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.44), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 })); shoe.position.set(x, 0.05, 0.1); heroYaw.add(shoe);
   });
-  const heroArms = [{ s: new THREE.Vector3(-0.5, 1.5, 0.05), g: glove(0xff7a29), h: hose(0xff7a29) }, { s: new THREE.Vector3(0.5, 1.5, 0.05), g: glove(0xff7a29), h: hose(0xff7a29) }];
-  heroArms.forEach((a) => heroYaw.add(a.g, a.h));
+  const heroArms = [{ s: new THREE.Vector3(-0.5, 0.9, 0.05), g: glove(0xff7a29), h: hose(0xff7a29) }, { s: new THREE.Vector3(0.5, 0.9, 0.05), g: glove(0xff7a29), h: hose(0xff7a29) }];
+  heroArms.forEach((a) => heroUpper.add(a.g, a.h));
+  const heroLight = new THREE.PointLight(0xffa24a, 0, 8, 2); heroLight.position.set(0, 1.4, 1.2); heroYaw.add(heroLight);
 
-  function drawFace(mood, charge) {
+  function drawFace(mood, charge, deg) {
     fg.clearRect(0, 0, 256, 512);
-    fg.fillStyle = charge > 0.01 ? `rgb(${Math.round(11 + 150 * charge)}, ${Math.round(8 + 10 * charge)}, ${Math.round(7 + 10 * charge)})` : '#0b0807';
-    fg.fillRect(0, 0, 256, 512);
+    const bgc = charge > 0.01 ? `rgb(${Math.round(11 + 150 * charge)}, ${Math.round(8 + 10 * charge)}, ${Math.round(7 + 10 * charge)})` : mood === 'power' ? '#1a2a10' : mood === 'tired' ? '#1b0a08' : '#0b0807';
+    fg.fillStyle = bgc; fg.fillRect(0, 0, 256, 512);
     fg.lineCap = 'round'; fg.lineWidth = 12;
     const eye = (cx) => {
       if (mood === 'hit') { fg.strokeStyle = '#fff'; fg.beginPath(); fg.moveTo(cx - 26, 150); fg.lineTo(cx + 22, 190); fg.moveTo(cx + 22, 150); fg.lineTo(cx - 26, 190); fg.stroke(); return; }
       if (mood === 'win') { fg.strokeStyle = '#fff'; fg.beginPath(); fg.arc(cx, 190, 30, Math.PI * 1.1, Math.PI * 1.9); fg.stroke(); return; }
-      fg.fillStyle = '#fff'; fg.beginPath(); fg.ellipse(cx, 170, 32, 44 + 6 * charge, 0, 0, Math.PI * 2); fg.fill();
-      fg.fillStyle = charge > 0.5 ? '#ff453a' : '#111'; fg.beginPath(); fg.arc(cx - 11, 176, 15, 0, Math.PI * 2); fg.fill();
+      if (mood === 'tired') { fg.strokeStyle = '#fff'; fg.beginPath(); fg.moveTo(cx - 30, 172); fg.lineTo(cx + 30, 182); fg.stroke(); fg.fillStyle = '#fff'; fg.beginPath(); fg.ellipse(cx, 190, 24, 12, 0, 0, Math.PI * 2); fg.fill(); return; }
+      fg.fillStyle = mood === 'power' ? '#fffbd0' : '#fff'; fg.beginPath(); fg.ellipse(cx, 170, 32, 44 + 6 * charge + (mood === 'power' ? 8 : 0), 0, 0, Math.PI * 2); fg.fill();
+      fg.fillStyle = mood === 'power' ? '#30D158' : charge > 0.5 ? '#ff453a' : '#111'; fg.beginPath(); fg.arc(cx - 11, 176, mood === 'power' ? 20 : 15, 0, Math.PI * 2); fg.fill();
     };
     eye(84); eye(172);
-    if (mood !== 'win' && mood !== 'hit') { // cejas decididas
-      fg.strokeStyle = '#ff7a29'; fg.lineWidth = 14;
-      fg.beginPath(); fg.moveTo(48, 108); fg.lineTo(112, 128); fg.moveTo(208, 108); fg.lineTo(144, 128); fg.stroke();
+    if (mood === 'idle' || mood === 'power') {
+      fg.strokeStyle = mood === 'power' ? '#30D158' : '#ff7a29'; fg.lineWidth = 14;
+      fg.beginPath(); fg.moveTo(44, 100); fg.lineTo(112, 126); fg.moveTo(212, 100); fg.lineTo(144, 126); fg.stroke();
     }
-    // La boca es el anillo del medidor.
-    fg.lineWidth = 16; fg.strokeStyle = mood === 'hit' ? '#ff453a' : '#30D158';
+    fg.lineWidth = 16; fg.strokeStyle = mood === 'hit' || mood === 'tired' ? '#ff453a' : '#30D158';
     fg.beginPath();
     if (mood === 'win') fg.arc(128, 300, 56, 0.1 * Math.PI, 0.9 * Math.PI);
     else if (mood === 'hit') fg.arc(128, 350, 40, 1.1 * Math.PI, 1.9 * Math.PI);
+    else if (mood === 'tired') { fg.moveTo(84, 340); fg.quadraticCurveTo(110, 320, 128, 340); fg.quadraticCurveTo(146, 360, 172, 336); }
+    else if (mood === 'power') fg.arc(128, 320, 44, 0.15 * Math.PI, 0.85 * Math.PI);
     else fg.moveTo(84, 330), fg.lineTo(172, 330);
     fg.stroke();
-    fg.fillStyle = '#fff'; fg.font = '900 74px "Big Shoulders Display", sans-serif'; fg.textAlign = 'center';
-    fg.fillText(mood === 'hit' ? '22°' : '0°', 128, 450);
+    fg.fillStyle = mood === 'tired' || mood === 'hit' ? '#ff453a' : '#fff'; fg.font = '900 74px "Big Shoulders Display", sans-serif'; fg.textAlign = 'center';
+    fg.fillText(`${Math.round(deg)}°`, 128, 450);
     faceTex.needsUpdate = true;
   }
 
   // ------------------------------------------------ efectos
-  const emissive = (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.2, transparent: true, depthWrite: false });
+  const emissive = (c, i = 1.2) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: i, transparent: true, depthWrite: false });
   const mkRing = (c, r = 0.4, tube = 0.06) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, tube, 10, 40), emissive(c)); m.visible = false; scene.add(m); m.rotation.y = Math.PI / 2; return m; };
   const heatRings = [0, 1, 2].map(() => mkRing(0xff5a1a));
   const bigHeat = [0, 1, 2].map(() => mkRing(0xff3a10, 0.6, 0.12));
   const beepRings = [0, 1, 2, 3].map(() => mkRing(0xffd60a));
-  const easRings = [mkRing(0xff453a, 0.7, 0.14), mkRing(0xffffff, 0.7, 0.1), mkRing(0xff453a, 0.7, 0.14)];
   const flashMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, depthWrite: false });
-  const sparks = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 14), flashMat(0xffffff)); m.visible = false; scene.add(m); return m; });
+  const sparks = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 14), flashMat(0xffffff)); m.visible = false; scene.add(m); return m; });
   const smoke = Array.from({ length: 10 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), new THREE.MeshBasicMaterial({ color: 0x8a8a92, transparent: true, depthWrite: false })); m.visible = false; scene.add(m); return m; });
-  const toast = [0, 1].map(() => { const m = new THREE.Mesh(new RoundedBoxGeometry(0.4, 0.4, 0.09, 3, 0.04), new THREE.MeshStandardMaterial({ color: 0xd9a066, roughness: 0.8 })); m.visible = false; scene.add(m); return m; });
+  const toast = Array.from({ length: 8 }, (_, i) => { const m = new THREE.Mesh(new RoundedBoxGeometry(0.4, 0.4, 0.09, 3, 0.04), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xd9a066 : 0xe8c27a, roughness: 0.8 })); m.visible = false; scene.add(m); return m; });
+  // Ondas en el suelo.
+  const shocks = Array.from({ length: 6 }, () => { const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 64), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.visible = false; scene.add(m); return m; });
+  const SHOCKS = [[0.9, 'oven', 0xff5a1a, 4.5, 1.2], [9.4, 'oven', 0xff3a10, 6, 1.4], [12.4, 'oven', 0xff3a10, 5, 1.1], [15.35, 'hero', 0x30D158, 6, 1.4], [16.55, 'hero', 0xffffff, 2.5, 0.6], [20.1, 'oven', 0xffffff, 8, 1.8]];
+  // Grietas que brillan tras el pisotón.
+  const cracks = Array.from({ length: 8 }, (_, i) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 0.03, 0.06), new THREE.MeshBasicMaterial({ color: 0xff5a1a, transparent: true }));
+    m.visible = false; scene.add(m); return { m, a: (i / 8) * Math.PI * 2 + 0.3, len: 1.4 + (i % 3) * 0.6 };
+  });
+  // Brasas del horno enfurecido.
+  const EMB = 160, embPos = new Float32Array(EMB * 3), embSeed = Array.from({ length: EMB }, (_, i) => [noiseF(i * 3.1), noiseF(i * 7.7), noiseF(i * 1.9)]);
+  const embGeo = new THREE.BufferGeometry(); embGeo.setAttribute('position', new THREE.BufferAttribute(embPos, 3));
+  const embers = new THREE.Points(embGeo, new THREE.PointsMaterial({ color: 0xff8a3a, size: 0.09, transparent: true, opacity: 0.9, depthWrite: false })); embers.frustumCulled = false; scene.add(embers);
+  // Aura de PostureFix al enderezarse y chispas que suben.
+  const aura = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.05, 10, 56), emissive(0x30D158, 1.6)); aura.visible = false; scene.add(aura);
+  const aura2 = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.03, 10, 56), emissive(0xffffff, 1.4)); aura2.visible = false; scene.add(aura2);
+  // Rayo de la alarma EAS: dos cilindros, uno rojo y otro blanco.
+  const beamA = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1, 24), emissive(0xff453a, 1.8)); beamA.visible = false; scene.add(beamA);
+  const beamB = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 16), emissive(0xffffff, 2.2)); beamB.visible = false; scene.add(beamB);
+  // Fuegos artificiales.
+  const FW = 3, FWN = 46;
+  const fwGeo = new THREE.BufferGeometry(); const fwPos = new Float32Array(FW * FWN * 3); fwGeo.setAttribute('position', new THREE.BufferAttribute(fwPos, 3));
+  const fwCols = [0xff7a29, 0x30D158, 0xffd60a];
+  const fws = fwCols.map((c, k) => { const p = new THREE.Points(fwGeo.clone(), new THREE.PointsMaterial({ color: c, size: 0.16, transparent: true, depthWrite: false })); p.frustumCulled = false; scene.add(p); return p; });
+  const FWT = [22.2, 22.8, 23.4], FWC = [[-1.2, 4.2], [1.0, 4.8], [-0.2, 3.8]];
 
   const travel = (mesh, f, t0, t1, xa, xb, y, scale0, scale1) => {
     const k = seg(f, t0, t1);
     mesh.visible = k > 0 && k < 1;
     if (!mesh.visible) return;
     mesh.position.set(lerp(xa, xb, k), y, 0.1);
-    const s = lerp(scale0, scale1, k);
-    mesh.scale.setScalar(s);
+    mesh.scale.setScalar(lerp(scale0, scale1, k));
     mesh.material.opacity = 1 - 0.5 * k;
   };
   const spark = (m, f, t0, x, y, size = 1.2) => {
     const k = seg(f, t0, t0 + 0.28);
-    m.visible = k > 0 && k < 1;
-    if (!m.visible) return;
-    m.position.set(x, y, 0.4);
-    m.scale.setScalar(lerp(0.3, size, easeOut(k)));
-    m.material.opacity = 1 - k;
+    if (!(k > 0 && k < 1)) return false;
+    m.visible = true; m.position.set(x, y, 0.4); m.scale.setScalar(lerp(0.3, size, easeOut(k))); m.material.opacity = 1 - k;
+    return true;
   };
 
-  const OVEN_HITS = [[3.65, 18], [6.05, 16], [6.55, 16], [7.05, 14], [10.3, 36]];
-  const HERO_HITS = [[5.3, 14], [8.9, 8]];
-  const hp = (hits, f) => 100 - hits.reduce((s, [t, d]) => s + d * easeOut(seg(f, t, t + 0.25)), 0);
-  const HERO_JABS = [3.4, 5.8, 6.3, 6.8];
   const pose = new THREE.Vector3();
+  const cam = { p: new THREE.Vector3(), l: new THREE.Vector3() };
+  function shot(f) {
+    let i = 0;
+    while (i < SHOTS.length - 2 && f >= SHOTS[i + 1][0]) i++;
+    const [t0, p0, l0] = SHOTS[i], [t1, p1, l1] = SHOTS[i + 1];
+    const k = smooth(clamp((f - t0) / Math.max(0.01, t1 - t0)));
+    cam.p.set(lerp(p0[0], p1[0], k), lerp(p0[1], p1[1], k), lerp(p0[2], p1[2], k));
+    cam.l.set(lerp(l0[0], l1[0], k), lerp(l0[1], l1[1], k), lerp(l0[2], l1[2], k));
+  }
 
   return {
     scene,
     update(f) {
-      // ---------- posiciones de los dos
-      const ovenX = lerp(-6.5, -1.9, easeOut(seg(f, 0, 1.3))) - 0.35 * OVEN_HITS.reduce((s, [t]) => s + (t < 10 ? bump(f, t, 0.35) : 0), 0) - 0.9 * easeOut(seg(f, 10.3, 11.1));
-      const heroX = lerp(6.5, 1.9, easeOut(seg(f, 0, 1.3))) + 0.35 * HERO_HITS.reduce((s, [t]) => s + bump(f, t, 0.35), 0) - 0.15 * bump(f, 2.4, 0.5);
-      const step = (f < 1.3 ? Math.abs(Math.sin(f * 11)) * 0.12 : 0);
-      const idle = Math.sin(f * 5) * 0.03;
-      const win = f > 11.6 ? Math.abs(Math.sin((f - 11.6) * 5.5)) * 0.55 * (1 - seg(f, 11.6, 14)) : 0;
-      const duck = 0.2 * bump(f, 2.4, 0.5);
-      ovenRoot.position.set(ovenX, step + idle * (f < 10.3 ? 1 : 0), 0);
-      ovenRoot.rotation.z = 1.45 * easeOut(seg(f, 10.3, 11.1)) + 0.06 * Math.sin(f * 40) * (f > 10.3 && f < 10.6 ? 1 : 0);
-      heroRoot.position.set(heroX, step + idle + win - duck, 0);
-      heroRoot.rotation.z = 0.12 * bump(f, 2.4, 0.5) - 0.1 * HERO_HITS.reduce((s, [t]) => s + bump(f, t, 0.35), 0);
-      heroYaw.scale.setScalar(1 + 0.1 * bump(f, 9.2, 0.65) * (f < 9.9 ? 1 : 0));
+      // ---------- estados de la historia
+      const rage = easeOut(seg(f, 9.3, 10.1)) * (1 - seg(f, 20.1, 20.4));
+      const hunch = (easeOut(seg(f, 11.6, 12.0)) * 0.55 + easeOut(seg(f, 13.0, 13.4)) * 0.4) * (1 - easeOut(seg(f, 15.3, 15.7)));
+      const kneel = easeOut(seg(f, 13.0, 13.5)) * (1 - easeOut(seg(f, 15.3, 15.8)));
+      const ko = f >= 20.1;
+      const koT = Math.max(0, f - 20.1);
 
-      // ---------- brazos (en coordenadas del mundo, luego al sistema del personaje)
+      // ---------- posiciones
+      let ovenX = lerp(-6.5, -1.9, easeOut(seg(f, 0.4, 2.0)));
+      const ovenRecoil = [5.05, 7.65, 8.15, 8.65].reduce((s, t) => s + bump(f, t, 0.35), 0) * 0.35;
+      const ovenPush = [16.9, 17.1, 17.3].reduce((s, t) => s + easeOut(seg(f, t, t + 0.25)), 0) * 0.55;
+      const lunge = 1.0 * bump(f, 10.6, 1.0) + 0.5 * bump(f, 12.2, 0.9);
+      ovenX += -ovenRecoil + lunge - ovenPush;
+      let ovenY = 0.8 * bump(f, 12.2, 0.8) + 0.12 * Math.sin(f * 5) * (ko ? 0 : 1);
+      let ovenRot = 0;
+      if (ko) {
+        const k = koT / 2.3;
+        ovenX = lerp(ovenX, -10, easeOut(clamp(k)));
+        ovenY = 4.5 * Math.sin(Math.PI * clamp(k * 0.9)) + 0.0;
+        ovenRot = 6 * easeOut(clamp(k));
+      }
+      ovenRoot.position.set(ovenX, ovenY + (f < 2 ? Math.abs(Math.sin(f * 11)) * 0.12 : 0), 0);
+      ovenRoot.rotation.z = ovenRot;
+      ovenRoot.scale.setScalar(1 + 0.24 * rage + 0.05 * bump(f, 9.3, 0.4));
+      steelMat.color.setRGB(lerp(0.6, 1.0, rage), lerp(0.6, 0.28, rage), lerp(0.64, 0.12, rage));
+      steelMat.emissiveIntensity = 0.9 * rage;
+      eyeMat.emissiveIntensity = 1.2 * rage;
+      ovenGlow.intensity = 25 * rage + 30 * bump(f, 10.8, 0.9) + 25 * bump(f, 12.2, 0.7);
+      glassMat.emissiveIntensity = 0.4 + 3.2 * Math.max(bump(f, 6.0, 0.9), bump(f, 10.8, 1.1)) + 2 * rage;
+
+      let heroX = lerp(6.5, 1.9, easeOut(seg(f, 0.4, 2.0)));
+      heroX += 0.35 * bump(f, 6.7, 0.35) + 1.2 * easeOut(seg(f, 11.6, 12.1)) * (1 - easeOut(seg(f, 15.3, 15.9))) + 0.4 * easeOut(seg(f, 13.0, 13.4)) * (1 - easeOut(seg(f, 15.3, 15.9)));
+      heroX -= 0.15 * bump(f, 3.8, 0.5);
+      const dash = easeOut(seg(f, 16.1, 16.5)) * (1 - easeOut(seg(f, 17.6, 18.3)));
+      heroX = lerp(heroX, -0.55, dash);
+      const win = f > 21.7 ? Math.abs(Math.sin((f - 21.7) * 5.5)) * 0.55 * (1 - seg(f, 21.7, 26)) : 0;
+      heroRoot.position.set(heroX, 0.12 * Math.sin(f * 5) * (kneel > 0.5 ? 0.3 : 1) + win - 0.32 * kneel - 0.2 * bump(f, 3.8, 0.5) + 0.15 * easeOut(seg(f, 15.3, 15.6)) * bump(f, 15.3, 0.8), 0);
+      heroRoot.rotation.z = 0.12 * bump(f, 3.8, 0.5) - 0.1 * (bump(f, 6.7, 0.35) + bump(f, 11.6, 0.4) + bump(f, 13.0, 0.4));
+      heroUpper.rotation.x = hunch + 0.12 * Math.sin(Math.min(1, seg(f, 15.3, 16.2)) * Math.PI) * -1; // se endereza con un rebote
+      heroUpper.position.y = 0.6 - 0.12 * kneel;
+      const chargeG = seg(f, 18.0, 19.5) * (1 - seg(f, 19.5, 19.7));
+      heroYaw.scale.setScalar(1 + 0.12 * chargeG + 0.1 * easeOut(seg(f, 15.3, 15.9)) * (1 - seg(f, 19.7, 21)));
+
+      // ---------- brazos
       scene.updateMatrixWorld(true);
-      const place = (arm, yaw, target) => {
-        const sh = yaw.localToWorld(arm.s.clone());
-        arm.g.position.copy(yaw.worldToLocal(target.clone()));
+      const place = (arm, parent, target) => {
+        arm.g.position.copy(parent.worldToLocal(target.clone()));
         setLimb(arm.h, arm.s, arm.g.position);
-        void sh;
       };
-      // Horno: el brazo hacia el héroe pega en 2.4 (falla) y los dos suben al soplar.
-      const raiseO = Math.max(bump(f, 4.6, 0.9), bump(f, 8.0, 1.1));
-      const jabO = bump(f, 2.4, 0.55);
-      pose.set(ovenX + 0.9 + 2.0 * jabO - 0.1 * raiseO, 1.05 + 0.5 * raiseO, 0.45); place(ovenArms[0], ovenYaw, pose);
-      pose.set(ovenX + 0.35 - 0.2 * raiseO, 1.0 + 0.7 * raiseO + Math.sin(f * 6) * 0.04, 0.7); place(ovenArms[1], ovenYaw, pose);
-      // Héroe: jabs, guardia, carga y festejo.
-      const jabH = HERO_JABS.reduce((s, t) => s + bump(f, t, 0.35), 0);
-      const charge = seg(f, 9.2, 9.8) * (1 - seg(f, 9.8, 9.95));
-      const winUp = seg(f, 11.5, 11.9);
-      const guard = bump(f, 8.4, 1.0);
-      pose.set(heroX - 0.8 - 2.1 * Math.min(1, jabH) + 0.5 * guard + 0.3 * charge, 1.25 + 0.7 * winUp + 0.3 * guard, 0.45); place(heroArms[0], heroYaw, pose);
-      pose.set(heroX - 0.4 + 0.3 * guard - 0.5 * charge, 1.2 + 0.7 * winUp + 0.3 * guard, 0.6); place(heroArms[1], heroYaw, pose);
+      const raiseO = Math.max(bump(f, 6.0, 0.9), bump(f, 10.6, 1.2), bump(f, 12.2, 0.9)) + 0.6 * rage;
+      const jabO = bump(f, 3.8, 0.55);
+      pose.set(ovenX + 0.9 + 2.0 * jabO - 0.1 * raiseO, 1.05 + 0.6 * raiseO, 0.45); place(ovenArms[0], ovenYaw, pose);
+      pose.set(ovenX + 0.35 - 0.2 * raiseO, 1.0 + 0.8 * raiseO + Math.sin(f * 6) * 0.04, 0.7); place(ovenArms[1], ovenYaw, pose);
+      const jabs = HERO_JABS.reduce((s, t) => s + bump(f, t, 0.35), 0) + [16.8, 17.0, 17.2].reduce((s, t) => s + bump(f, t, 0.25), 0);
+      const charge = seg(f, 9.2, 9.3) * 0 + seg(f, 18.0, 19.5) * (1 - seg(f, 19.5, 19.7));
+      const guard = bump(f, 10.6, 1.4) + bump(f, 12.2, 1.0);
+      const winUp = seg(f, 21.6, 22.0);
+      // Encorvado, los brazos cuelgan y dejan ver la cara.
+      const slump = clamp(hunch / 0.55);
+      pose.set(heroX - 0.8 - 2.2 * Math.min(1, jabs) + 0.5 * guard + 0.3 * charge + 0.4 * slump, lerp(1.25 + 0.7 * winUp + 0.3 * guard, 0.55, slump), 0.45); place(heroArms[0], heroUpper, pose);
+      pose.set(heroX - 0.4 + 0.3 * guard - 0.5 * charge + 0.7 * slump, lerp(1.2 + 0.7 * winUp + 0.3 * guard, 0.5, slump), 0.6); place(heroArms[1], heroUpper, pose);
 
-      // ---------- ojos del horno y su boca (la puerta brilla al atacar)
-      const heat = Math.max(bump(f, 4.6, 0.9), bump(f, 8.0, 1.1) * 1.4);
-      glassMat.emissiveIntensity = 0.4 + 3.2 * heat;
-      eyes.forEach((e) => { e.p.position.x = e.e.position.x + 0.05; e.p.position.y = 1.58 - 0.02 * (f > 10.3 ? 1 : 0); });
-      doorPivot.rotation.x = 1.7 * easeOut(seg(f, 10.5, 11.0));
-      const koMood = f > 10.3 && f < 10.9;
-      eyes.forEach((e) => { e.e.scale.y = koMood ? 0.15 : 1; e.p.visible = !koMood; });
+      // ---------- ojos y puerta del horno
+      eyes.forEach((e) => { e.p.position.x = e.x + 0.05; });
+      doorPivot.rotation.x = 1.7 * easeOut(seg(f, 20.3, 20.8));
+      const koMood = f > 20.1 && f < 20.9;
+      eyes.forEach((e) => { e.e.scale.y = koMood ? 0.15 : 1; e.p.visible = !koMood; e.b.rotation.z = (e.x < 0 ? -1 : 1) * (0.42 + 0.35 * rage); });
 
-      // ---------- el héroe: cara según el momento
-      const hitNow = HERO_HITS.some(([t]) => f >= t && f < t + 0.35);
-      drawFace(f > 11.5 ? 'win' : hitNow ? 'hit' : 'idle', charge);
+      // ---------- cara de PostureFix
+      const hitNow = [6.7, 11.6, 13.0].some((t) => f >= t && f < t + 0.4);
+      const mood = f > 21.7 ? 'win' : hitNow ? 'hit' : (f >= 11.9 && f < 15.3) ? 'tired' : f >= 15.3 ? 'power' : 'idle';
+      drawFace(mood, charge, (hunch / 0.95) * 38);
+      heroLight.intensity = 14 * easeOut(seg(f, 15.3, 15.8)) * (1 - seg(f, 20.1, 21)) + 20 * charge;
+      heroLight.color.set(f > 18 ? 0xff8a60 : 0x7aff9a);
+      phoneBody.material.emissiveIntensity = 0.15 + 1.2 * easeOut(seg(f, 15.3, 15.8)) * (1 - seg(f, 20.1, 21)) + charge;
 
-      // ---------- ataques: ondas de calor, pitidos y alarma
+      // ---------- ataques
       const oy = 1.15, hy = 1.3;
-      travel(heatRings[0], f, 4.8, 5.3, ovenX + 0.9, heroX - 0.6, oy, 0.5, 1.4);
-      travel(heatRings[1], f, 4.9, 5.4, ovenX + 0.9, heroX - 0.6, oy, 0.4, 1.2);
-      travel(heatRings[2], f, 5.0, 5.5, ovenX + 0.9, heroX - 0.6, oy, 0.3, 1.0);
-      [0, 1, 2].forEach((i) => travel(bigHeat[i], f, 8.4 + i * 0.1, 8.95 + i * 0.1, ovenX + 0.9, heroX - 0.5, oy + 0.2, 0.6, 2.0));
+      travel(heatRings[0], f, 6.2, 6.7, ovenX + 0.9, heroX - 0.6, oy, 0.5, 1.4);
+      travel(heatRings[1], f, 6.3, 6.8, ovenX + 0.9, heroX - 0.6, oy, 0.4, 1.2);
+      travel(heatRings[2], f, 6.4, 6.9, ovenX + 0.9, heroX - 0.6, oy, 0.3, 1.0);
+      [0, 1, 2].forEach((i) => travel(bigHeat[i], f, 10.9 + i * 0.12, 11.6 + i * 0.12, ovenX + 0.9, heroX - 0.5, oy + 0.2, 0.7, 2.3));
       HERO_JABS.forEach((t, i) => travel(beepRings[i], f, t, t + 0.25, heroX - 0.9, ovenX + 0.7, hy, 0.5, 1.1));
-      easRings.forEach((r, i) => travel(r, f, 9.8 + i * 0.12, 10.3 + i * 0.12, heroX - 0.9, ovenX + 0.5, hy, 0.6, 2.8));
+      // el rayo EAS
+      const beamK = seg(f, 19.5, 19.9) * (1 - seg(f, 20.2, 20.5));
+      const bx0 = heroX - 0.9, bx1 = ovenX + 0.5, bl = Math.max(0.01, Math.abs(bx0 - bx1) * seg(f, 19.5, 19.85));
+      [beamA, beamB].forEach((b, i) => {
+        b.visible = beamK > 0.01; if (!b.visible) return;
+        b.rotation.z = Math.PI / 2; b.scale.set((1 + 0.25 * Math.sin(f * 90 + i)) * beamK, bl, (1 + 0.25 * Math.sin(f * 90 + i)) * beamK);
+        b.position.set(bx0 - bl / 2, hy, 0.3); b.material.opacity = beamK;
+      });
       // chispas de impacto
-      const ox = ovenX, hx = heroX;
-      spark(sparks[0], f, 3.65, ox + 0.8, 1.2); spark(sparks[1], f, 5.3, hx - 0.6, 1.3);
-      [6.05, 6.55, 7.05].forEach((t) => spark(sparks[0], f, t, ox + 0.8, 1.2));
-      spark(sparks[1], f, 8.9, hx - 0.6, 1.3, 1.8);
-      spark(sparks[0], f, 10.3, ox + 0.8, 1.2, 3.4);
-
-      // ---------- K.O.: humo y tostadas
-      smoke.forEach((m, i) => {
-        const k = seg(f, 10.4 + i * 0.12, 12.0 + i * 0.12);
+      const sp0 = [[5.05, 1.2], [7.65, 1.3], [8.15, 1.3], [8.65, 1.5], [16.9, 1.5], [17.1, 1.6], [17.3, 2.0], [20.1, 5.0]];
+      let used0 = false;
+      sp0.forEach(([t, size]) => { used0 = spark(sparks[0], f, t, ovenX + 0.8, 1.2, size) || used0; });
+      if (!used0) sparks[0].visible = false;
+      let used1 = false;
+      [[6.7, 1.3], [11.6, 2.4], [13.0, 2.0]].forEach(([t, size]) => { used1 = spark(sparks[1], f, t, heroX - 0.6, 1.3, size) || used1; });
+      if (!used1) sparks[1].visible = false;
+      if (!spark(sparks[2], f, 15.4, heroX, 1.3, 3.2)) sparks[2].visible = false;
+      // ondas del suelo
+      shocks.forEach((m, i) => {
+        const [t0, who, color, maxR, dur] = SHOCKS[i];
+        const k = seg(f, t0, t0 + dur);
         m.visible = k > 0 && k < 1;
         if (!m.visible) return;
-        m.position.set(ox - 0.3 + Math.sin(i * 2.1 + f * 2) * 0.35, 0.8 + 1.8 * k, 0.5);
-        m.scale.setScalar(0.6 + 1.6 * k);
-        m.material.opacity = 0.55 * (1 - k);
+        m.position.x = who === 'oven' ? ovenX : heroX;
+        m.scale.setScalar(0.3 + maxR * easeOut(k));
+        m.material.color.set(color); m.material.opacity = 0.8 * (1 - k);
+      });
+      cracks.forEach((c) => {
+        const k = seg(f, 12.4, 12.9);
+        c.m.visible = f > 12.4 && f < 20.4;
+        if (!c.m.visible) return;
+        const len = c.len * easeOut(k);
+        c.m.scale.x = Math.max(0.01, len);
+        c.m.position.set(ovenX + Math.cos(c.a) * len / 2, 0.06, Math.sin(c.a) * len / 2);
+        c.m.rotation.y = -c.a;
+        c.m.material.opacity = f < 19.5 ? 0.9 : 1 - seg(f, 19.5, 20.4);
+      });
+      // brasas
+      for (let i = 0; i < EMB; i++) {
+        const [a, b, c] = embSeed[i];
+        const life = ((f * (0.5 + c) + a * 4) % 1);
+        embPos[i * 3] = ovenX + (a - 0.5) * 1.8 * (1 + life);
+        embPos[i * 3 + 1] = 0.4 + life * 3.5 * (0.5 + b);
+        embPos[i * 3 + 2] = (b - 0.5) * 1.4;
+      }
+      embGeo.attributes.position.needsUpdate = true;
+      embers.visible = rage > 0.05; embers.material.opacity = 0.9 * rage;
+      // aura de la espalda recta
+      const au = seg(f, 15.3, 16.0);
+      aura.visible = aura2.visible = f >= 15.3 && f < 21;
+      if (aura.visible) {
+        const pulse = 1 + 0.1 * Math.sin(f * 14);
+        aura.position.set(heroX, 1.3, 0.1); aura.scale.setScalar((0.6 + 1.4 * easeOut(au)) * pulse); aura.rotation.set(0, Math.PI / 2, f * 3);
+        aura2.position.set(heroX, 1.3, 0.1); aura2.scale.setScalar((0.5 + 1.8 * easeOut(au)) * (2 - pulse)); aura2.rotation.set(f * 2, Math.PI / 2, 0);
+        aura.material.opacity = aura2.material.opacity = 0.9 * (1 - seg(f, 19.7, 21));
+      }
+      // humo y tostadas
+      smoke.forEach((m, i) => {
+        const k = seg(f, 20.2 + i * 0.12, 22.0 + i * 0.12);
+        m.visible = k > 0 && k < 1;
+        if (!m.visible) return;
+        m.position.set(ovenX * 0.8 + Math.sin(i * 2.1 + f * 2) * 0.5, 0.8 + 2.2 * k + (ovenY > 1 ? ovenY : 0), 0.5);
+        m.scale.setScalar(0.6 + 1.8 * k); m.material.opacity = 0.55 * (1 - k);
       });
       toast.forEach((m, i) => {
-        const tau = f - (10.85 + i * 0.1);
-        m.visible = tau > 0 && tau < 3;
+        const tau = f - (20.2 + i * 0.05);
+        m.visible = tau > 0 && tau < 3.2;
         if (!m.visible) return;
-        const v = [[1.2, 5.4], [-0.5, 6.2]][i];
-        m.position.set(ox - 0.3 + v[0] * tau, 0.9 + v[1] * tau - 4.9 * tau * tau, 0.6);
-        m.rotation.set(tau * 3 * (i ? -1 : 1), 0, tau * 5);
+        const v = [[2.5, 6], [-2.0, 6.8], [4.0, 5], [-3.2, 5.6], [1.2, 7.4], [-0.6, 6.4], [3.2, 6.2], [-1.4, 7.0]][i];
+        m.position.set(-2.0 + v[0] * tau, 1.0 + v[1] * tau - 4.9 * tau * tau, 0.6);
+        m.rotation.set(tau * 3 * (i % 2 ? -1 : 1), tau * 2, tau * 5);
         if (m.position.y < 0.2) m.position.y = 0.2;
       });
+      // fuegos artificiales
+      fws.forEach((p, k) => {
+        const tau = f - FWT[k];
+        p.visible = tau > 0 && tau < 1.8;
+        if (!p.visible) return;
+        const arr = p.geometry.attributes.position;
+        for (let i = 0; i < FWN; i++) {
+          const th = (i / FWN) * Math.PI * 2, sp = 1.2 + noiseF(i * 5.3 + k) * 1.4, tilt = (noiseF(i * 2.7 + k) - 0.5) * 1.6;
+          arr.setXYZ(i, FWC[k][0] + Math.cos(th) * sp * tau * Math.cos(tilt), FWC[k][1] + Math.sin(th) * sp * tau - 2.2 * tau * tau, 0.3 + Math.sin(tilt) * tau);
+        }
+        arr.needsUpdate = true; p.material.opacity = 1 - seg(tau, 0.9, 1.8);
+      });
 
-      // ---------- cámara: dos planos, más cerca al final
-      const zoom = lerp(7.4, 6.2, easeInOut(seg(f, 9.0, 10.3))) + 0.6 * seg(f, 12.0, 14);
-      const shake = (hit) => hit * Math.sin(f * 90) * 0.05;
-      const sh = shake(bump(f, 10.3, 0.5)) + shake(0.3 * bump(f, 5.3, 0.3));
-      camera.position.set(Math.sin(f * 0.3) * 0.6 + sh, 2.0 + 0.15 * Math.sin(f * 0.4), zoom);
-      camera.lookAt(-0.1, 1.05, 0);
+      // ---------- luces: relámpagos y foco del final
+      bolt.intensity = [0.2, 1.1, 9.3, 15.3, 20.1].reduce((s, t) => s + 900 * Math.max(0, 1 - Math.abs(f - t) / 0.12) * (Math.sin(f * 120) > -0.3 ? 1 : 0.3), 0);
+      stageLight.intensity = 1400 * seg(f, 21.6, 22.2) * (1 - seg(f, 25.4, 26));
+      stageLight.target.position.x = heroX;
+      rimMat.emissiveIntensity = 0.9 + 1.2 * rage + 0.8 * Math.max(0, Math.sin(f * 12)) * rage;
+
+      // ---------- cámara
+      shot(f);
+      const sh = (hit, amp) => hit * Math.sin(f * 95) * amp;
+      const bumpHits = [5.05, 6.7, 7.65, 8.15, 8.65, 11.6, 13.0, 16.9, 17.1, 17.3].reduce((s, t) => s + bump(f, t, 0.3), 0);
+      const shakeAmp = 0.05 * bumpHits + 0.16 * bump(f, 20.1, 0.9) + 0.08 * bump(f, 9.3, 0.9) + 0.07 * bump(f, 12.4, 0.5) + 0.06 * bump(f, 15.3, 0.6);
+      camera.position.set(cam.p.x + sh(shakeAmp, 1), cam.p.y + sh(shakeAmp, 0.8) * Math.cos(f * 40), cam.p.z - 0.7 * easeOut(seg(f, 20.0, 20.25)) * (1 - seg(f, 20.25, 20.9)));
+      camera.lookAt(cam.l);
+      camera.fov = 38 + 5 * bump(f, 9.3, 1.0) + 7 * bump(f, 20.1, 0.6) + 3 * bump(f, 15.3, 0.8);
+      camera.updateProjectionMatrix();
       camera.clearViewOffset();
       camera.updateMatrixWorld();
-      project('oven', new THREE.Vector3(ox, 2.1, 0));
-      project('hero', new THREE.Vector3(hx, 2.3, 0));
-      screen.hpOven = [hp(OVEN_HITS, f)]; screen.hpHero = [hp(HERO_HITS, f)];
+      project('oven', new THREE.Vector3(ovenX, 2.1 + ovenY, 0));
+      project('hero', new THREE.Vector3(heroX, 2.3, 0));
+      screen.hpOven = [hpOf(OVEN_HITS, f)]; screen.hpHero = [hpOf(HERO_HITS, f)];
+      screen.speed = [Math.max(dash, chargeG * 0.6, bump(f, 9.3, 0.9) * 0.8)];
     },
   };
 }
+
+function noiseF(x) { const s = Math.sin(x * 127.1) * 43758.5453; return s - Math.floor(s); }
 
 // ============================================================ reparto
 const A = buildA(), B = buildB(), Cc = buildC(), D = buildD(), F = buildF();
@@ -659,7 +829,7 @@ const SCENES = [
   { s: B, a: 7.0, b: 13.2 },
   { s: Cc, a: 13.0, b: 23.2 },
   { s: D, a: 32.5, b: 48.0 },
-  { s: F, a: 71.0, b: 85.0 },
+  { s: F, a: 71.0, b: 97.0 },
 ];
 
 window.T3 = {
