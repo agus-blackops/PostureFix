@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Apoyo Ya · prototipo</title>
+<meta name="theme-color" content="#3b6fd8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Apoyo Ya · prototipo v2</title>
 <style>
   :root {
     --bg: #f6f7fb; --card: #ffffff; --text: #1d2233; --muted: #5b6275;
@@ -80,7 +83,7 @@
 
 <main>
   <h1>Apoyo Ya</h1>
-  <p class="muted">Prototipo. Todo lo que escribes se queda en tu teléfono o computador; no se envía a ningún servidor.</p>
+  <p class="muted">Prototipo v2. Todo lo que escribes se queda en tu teléfono o computador; no se envía a ningún servidor.</p>
 
   <!-- ÁNIMO -->
   <section class="card" aria-labelledby="animo-t">
@@ -197,13 +200,19 @@
   if (animo && animo.dia === new Date().toISOString().slice(0, 10)) renderMood(animo.valor);
 
   // ---------- Personas de confianza ----------
+  // Abre la app de SMS con un mensaje ya escrito. Lo envía la persona, no la app.
+  function linkAviso(c) {
+    var texto = "Hola, no estoy bien y necesito hablar contigo. ¿Puedes llamarme?";
+    return "sms:" + c.tel.replace(/[^\d+]/g, "") + "?body=" + encodeURIComponent(texto);
+  }
   function renderContactos() {
     var lista = store.get("apoyo.contactos", []);
     $("contactos").innerHTML = lista.length ? "" : '<li class="muted">Aún no has guardado a nadie.</li>';
     lista.forEach(function (c, i) {
       var li = document.createElement("li");
       li.innerHTML = '<span>' + esc(c.nombre) + '</span><span><a href="tel:' + esc(c.tel) +
-        '">' + esc(c.tel) + '</a> <button class="ghost" data-del="' + i + '" type="button">Quitar</button></span>';
+        '">' + esc(c.tel) + '</a> <a href="' + esc(linkAviso(c)) + '">Avisar</a> ' +
+        '<button class="ghost" data-del="' + i + '" type="button">Quitar</button></span>';
       $("contactos").appendChild(li);
     });
   }
@@ -274,6 +283,11 @@
     $("feedback").textContent = "Registro borrado.";
   });
   renderReportes();
+
+  // ---------- Sin conexión ----------
+  if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  }
 
   // ---------- Tema ----------
   $("tema").addEventListener("click", function () {
