@@ -1,0 +1,79 @@
+# Publica la versión de webcam en GitHub Pages:
+#   https://agus-blackops.github.io/PostureFix/
+# En los PR solo se construye, para comprobar que no se ha roto. Se publica al
+# llegar a main (o a mano desde Actions), porque GitHub Pages solo deja
+# publicar desde la rama principal.
+#
+# Una sola vez hace falta activarlo en Settings → Pages → Source: «GitHub Actions».
+name: Web
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'src/core/**'
+      - 'assets/sounds/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/web.yml'
+
+permissions:
+  contents: read
+
+# Una publicación a la vez; la nueva espera a que acabe la anterior.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    name: construir
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Sin Electron: la web no lo necesita y tarda en bajar.
+      - name: Instalar dependencias
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Comprobaciones
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Construir la web
+        run: |
+          npm run web:build
+          # Los modelos tienen que ir dentro: sin ellos la página tiraría del CDN.
+          ls -lh web/dist/models
+          test -s web/dist/models/pose_landmarker_full.task
+          test -s web/dist/models/pose_landmarker_lite.task
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  publicar:
+    name: publicar
+    needs: construir
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PostureFix — Tráiler 3 (2D + 3D)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family: 'Big Shoulders Display'; font-weight: 800; src: url(fonts/BigShouldersDisplay-800.ttf); }
+  @font-face { font-family: 'Big Shoulders Display'; font-weight: 900; src: url(fonts/BigShouldersDisplay-900.ttf); }
+  @font-face { font-family: 'Inter'; font-weight: 600; src: url(fonts/Inter-600.ttf); }
+  @font-face { font-family: 'Inter'; font-weight: 800; src: url(fonts/Inter-800.ttf); }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #wrap { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center; }
+  #shake { position: absolute; inset: 0; background: #0A0706; }
+  #bg, #gl, #svg { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: block; }
+  .disp { font-family: 'Big Shoulders Display', 'Liberation Sans', sans-serif; font-weight: 900; }
+  .sans { font-family: 'Inter', 'Liberation Sans', sans-serif; font-weight: 600; }
+  .sansb { font-family: 'Inter', 'Liberation Sans', sans-serif; font-weight: 800; }
+  text { white-space: pre; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="shake">
+  <svg id="bg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+  <canvas id="gl" width="1920" height="1080"></canvas>
+  <svg id="svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+</div></div>
+<script src="trailer3-3d.js"></script>
+<script>
+/*
+ * Tráiler 3: más largo y con escenas en 3D (three.js) mezcladas con las de 2D.
+ * Igual que los otros, es una función del tiempo, `setT(t)`: el lienzo `#gl`
+ * lleva lo 3D, los SVG (debajo y encima) llevan el fondo y los textos.
+ */
+const W = 1920, H = 1080, DURATION = 103;
+const C = {
+  bg: '#0A0706', orange: '#FF7A29', orange2: '#FF8A45', red: '#FF453A',
+  green: '#30D158', yellow: '#FFD60A', ink: '#FFFFFF',
+  dim: 'rgba(246,236,230,0.66)', dimmer: 'rgba(246,236,230,0.38)', line: '#5B4A44',
+};
+const QR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35 35" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h35v35H0z"/><path stroke="#0a0706" d="M1 1.5h7m1 0h2m1 0h2m3 0h1m2 0h3m1 0h1m2 0h7M1 2.5h1m5 0h1m1 0h2m1 0h2m1 0h1m1 0h2m5 0h2m1 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m2 0h3m1 0h4m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m1 0h1m9 0h1m2 0h1m2 0h1m1 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m2 0h2m1 0h2m2 0h3m3 0h3m1 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m2 0h3m2 0h3m1 0h1m2 0h3m2 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h5m2 0h5m4 0h1M1 9.5h1m1 0h2m1 0h3m1 0h1m4 0h5m2 0h4m1 0h1m2 0h1m1 0h2M3 10.5h3m3 0h7m1 0h2m1 0h2m2 0h1m2 0h2m1 0h3M1 11.5h3m1 0h1m1 0h2m2 0h2m1 0h1m2 0h1m1 0h1m2 0h3m2 0h4m1 0h2M1 12.5h3m1 0h1m2 0h2m3 0h1m2 0h3m1 0h1m1 0h2m2 0h3m1 0h1m2 0h1M2 13.5h1m1 0h2m1 0h3m1 0h1m1 0h1m1 0h3m3 0h6m2 0h2m1 0h2M1 14.5h6m3 0h1m2 0h3m2 0h1m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1M3 15.5h2m1 0h4m2 0h1m2 0h1m2 0h1m1 0h3m4 0h3M5 16.5h2m4 0h1m1 0h1m1 0h2m5 0h1m2 0h3m2 0h2M5 17.5h3m3 0h5m5 0h3m2 0h2m1 0h3M1 18.5h1m1 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m4 0h1m1 0h5m1 0h2m1 0h2M5 19.5h1m1 0h1m3 0h2m1 0h1m1 0h2m1 0h1m1 0h2m2 0h2m1 0h2m1 0h1M1 20.5h1m1 0h1m5 0h3m2 0h1m3 0h3m2 0h5m1 0h1m2 0h1M3 21.5h1m1 0h1m1 0h4m3 0h2m1 0h1m5 0h1m1 0h1m2 0h1m1 0h3M1 22.5h1m8 0h1m2 0h6m2 0h4m5 0h1m2 0h1M3 23.5h6m1 0h2m1 0h2m1 0h1m1 0h5m1 0h4m3 0h3M2 24.5h1m3 0h1m2 0h1m1 0h3m2 0h1m2 0h1m1 0h1m5 0h4m2 0h1M1 25.5h1m2 0h1m1 0h3m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m2 0h8m2 0h1M9 26.5h1m1 0h2m1 0h1m1 0h2m2 0h3m2 0h1m3 0h2m1 0h1M1 27.5h7m1 0h3m2 0h2m1 0h6m1 0h2m1 0h1m1 0h1M1 28.5h1m5 0h1m1 0h1m1 0h2m2 0h5m1 0h1m2 0h2m3 0h3M1 29.5h1m1 0h3m1 0h1m2 0h4m1 0h6m2 0h7m1 0h1m1 0h1M1 30.5h1m1 0h3m1 0h1m1 0h1m7 0h1m2 0h1m1 0h3m3 0h1m3 0h2M1 31.5h1m1 0h3m1 0h1m1 0h1m2 0h1m3 0h4m1 0h1m1 0h1m3 0h2m1 0h1M1 32.5h1m5 0h1m3 0h3m1 0h1m2 0h1m2 0h1m1 0h7m3 0h1M1 33.5h7m1 0h2m1 0h1m4 0h4m1 0h1m1 0h1m1 0h2m1 0h3"/></svg>`;
+
+// ----------------------------------------------------------------- utilidades
+const NS = 'http://www.w3.org/2000/svg';
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeIn = (x) => x * x * x;
+const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+/** Muelle con un pequeño rebote, de 0 a 1. */
+const spring = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-7 * x) * Math.cos(11 * x));
+const noise = (x) => { const s = Math.sin(x * 127.1) * 43758.5453; return s - Math.floor(s); };
+const smoothNoise = (x) => { const i = Math.floor(x), f = x - i; return lerp(noise(i), noise(i + 1), f * f * (3 - 2 * f)); };
+
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, k) => {
+  const A = hex(a), B = hex(b);
+  return '#' + A.map((v, i) => Math.round(lerp(v, B[i], clamp(k))).toString(16).padStart(2, '0')).join('');
+};
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs || {}) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function text(parent, str, x, y, size, cls, fill, anchor = 'start') {
+  const e = el('text', { x, y, 'font-size': size, class: cls, fill, 'text-anchor': anchor }, parent);
+  e.textContent = str;
+  return e;
+}
+const op = (e, v) => e.setAttribute('opacity', clamp(v).toFixed(3));
+const place = (e, x = 0, y = 0, s = 1, r = 0, ox = 0, oy = 0) =>
+  e.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${r.toFixed(2)}) scale(${s.toFixed(4)}) translate(${-ox} ${-oy})`);
+/** Escala y gira alrededor de un punto. */
+const around = (e, cx, cy, s = 1, r = 0) => place(e, cx, cy, s, r, cx, cy);
+/** Aparece subiendo: devuelve el avance 0-1 y aplica opacidad y desplazamiento. */
+function reveal(e, t, a, dur = 0.55, dy = 28) {
+  const p = easeOut(seg(t, a, a + dur));
+  op(e, p);
+  e.setAttribute('transform', `translate(0 ${((1 - p) * dy).toFixed(2)})`);
+  return p;
+}
+const sceneAlpha = (t, a, b, f = 0.35) => Math.min(seg(t, a, a + f), 1 - seg(t, b - f, b));
+
+
+// ------------------------------------------------------------------- escenario
+const bgSvg = document.getElementById('bg');
+const bdefs = el('defs', {}, bgSvg);
+for (const [id, color, a] of [['glowO', C.orange, 0.55], ['glowR', C.red, 0.6]]) {
+  const g = el('radialGradient', { id, cx: '50%', cy: '50%', r: '50%' }, bdefs);
+  el('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': a }, g);
+  el('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }, g);
+}
+const glow1 = el('ellipse', { cx: 360, cy: 980, rx: 900, ry: 560, fill: 'url(#glowO)' }, bgSvg);
+const glow2 = el('ellipse', { cx: 1640, cy: 80, rx: 760, ry: 460, fill: 'url(#glowR)' }, bgSvg);
+const svg = document.getElementById('svg');
+const defs = el('defs', {}, svg);
+const vig = el('radialGradient', { id: 'vig', cx: '50%', cy: '50%', r: '75%' }, defs);
+el('stop', { offset: '55%', 'stop-color': '#000', 'stop-opacity': '0' }, vig);
+el('stop', { offset: '100%', 'stop-color': '#000', 'stop-opacity': '0.65' }, vig);
+// El S7 (cierre) reutiliza los resplandores del tráiler 1 en su propio halo.
+for (const [id, color, a] of [['glowO', C.orange, 0.55]]) {
+  const g = el('radialGradient', { id: id + '2', cx: '50%', cy: '50%', r: '50%' }, defs);
+  el('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': a }, g);
+  el('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }, g);
+}
+const shake = document.getElementById('shake');
+const stage = el('g', {}, svg);
+const scenes = {};
+for (const id of ['a', 'b', 'c', 'd', 's4', 's5', 's6', 'f', 't', 'fight', 's7']) scenes[id] = el('g', {}, stage);
+const flash = el('rect', { width: W, height: H, fill: '#fff', opacity: 0 }, svg);
+el('rect', { width: W, height: H, fill: 'url(#vig)', 'pointer-events': 'none' }, svg);
+const fade = el('rect', { width: W, height: H, fill: '#000', opacity: 0 }, svg);
+
+// ------------------------------------------------------------------ escena 4
+const S4 = {};
+{
+  const g = scenes.s4;
+  S4.bgRed = el('rect', { width: W, height: H, fill: C.red, opacity: 0 }, g);
+  S4.bgGreen = el('rect', { width: W, height: H, fill: C.green, opacity: 0 }, g);
+  S4.steps = ['1 · PITIDO', '2 · CUENTA', '3 · ALARMA', '4 · RECUPERA'].map((s, i) => {
+    const row = el('g', {}, g);
+    const bg = el('rect', { x: 330 + i * 316, y: 80, width: 296, height: 62, rx: 31, fill: 'rgba(255,255,255,0.08)' }, row);
+    const tx = text(row, s, 330 + i * 316 + 148, 122, 30, 'sansb', C.dimmer, 'middle');
+    return { row, bg, tx };
+  });
+  S4.intro = text(g, 'LA ALERTA SUBE DE TONO', 960, 570, 150, 'disp', C.ink, 'middle');
+  S4.beepRings = [0, 1, 2, 3].map(() => el('circle', { cx: 960, cy: 560, r: 10, fill: 'none', stroke: C.yellow, 'stroke-width': 8, opacity: 0 }, g));
+  S4.beep = text(g, 'PITIDO', 960, 640, 250, 'disp', C.yellow, 'middle');
+  S4.beepSub = text(g, 'A los 4 segundos encorvado', 960, 780, 46, 'sans', C.dim, 'middle');
+  S4.count = text(g, 'UNO', 960, 720, 420, 'disp', C.ink, 'middle');
+  S4.countSub = text(g, 'la voz cuenta', 960, 830, 46, 'sans', C.dim, 'middle');
+  S4.alarm1 = text(g, '¡ENDEREZA LA', 960, 510, 200, 'disp', '#fff', 'middle');
+  S4.alarm2 = text(g, 'ESPALDA!', 960, 790, 290, 'disp', '#fff', 'middle');
+  S4.eas = text(g, 'Tono EAS · 853 + 960 Hz', 960, 940, 44, 'sansb', '#fff', 'middle');
+  S4.ok = text(g, 'BIEN.', 960, 600, 380, 'disp', '#fff', 'middle');
+  S4.ok2 = text(g, 'Espalda recta.', 960, 740, 90, 'sansb', '#fff', 'middle');
+  S4.check = el('path', { d: 'M-90 0 L-30 62 L96 -74', stroke: '#fff', 'stroke-width': 28, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g);
+}
+function updateS4(t) {
+  op(scenes.s4, sceneAlpha(t, 21, 30.5, 0.2));
+  // Qué paso está activo.
+  const phase = t < 24 ? 0 : t < 26.8 ? 1 : t < 29.6 ? 2 : 3;
+  S4.steps.forEach((s, i) => {
+    const on = t >= 21.4 && i === phase && t < 30.5, done = t >= 21.4 && i < phase;
+    s.bg.setAttribute('fill', on ? (i === 2 ? C.red : i === 3 ? C.green : C.orange) : done ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.07)');
+    s.tx.setAttribute('fill', on ? (i === 1 ? '#1F0C02' : '#fff') : done ? C.dim : C.dimmer);
+    reveal(s.row, t, 21.2 + i * 0.08, 0.4, -20);
+  });
+  // Introducción.
+  const iv = seg(t, 21.0, 21.25) * (1 - seg(t, 21.35, 21.6));
+  op(S4.intro, iv); around(S4.intro, 960, 520, lerp(1.0, 1.06, seg(t, 21, 21.6)));
+  // Pitido: cuatro pulsos.
+  const beepOn = t >= 21.5 && t < 24.0;
+  op(S4.beep, beepOn ? seg(t, 21.5, 21.6) * (1 - seg(t, 23.7, 24.0)) : 0);
+  const sc = beepOn ? 1 + 0.1 * Math.max(0, 1 - ((t - 21.5) % 0.3) / 0.15) : 1;
+  around(S4.beep, 960, 560, sc);
+  op(S4.beepSub, beepOn ? seg(t, 21.9, 22.3) * (1 - seg(t, 23.7, 24.0)) : 0);
+  S4.beepRings.forEach((r, i) => {
+    const k = (t - (21.5 + i * 0.3)) / 0.9;
+    if (k < 0 || k > 1) { op(r, 0); return; }
+    r.setAttribute('r', (60 + easeOut(k) * 640).toFixed(1)); op(r, 0.85 * (1 - k));
+    r.setAttribute('stroke', i % 2 ? C.orange : C.yellow);
+  });
+  // Cuenta.
+  const words = ['UNO', 'DOS', 'TRES'], cols = [C.yellow, C.orange, C.red];
+  const ci = clamp(Math.floor((t - 24.0) / 0.9), 0, 2);
+  const counting = t >= 24.0 && t < 26.8;
+  const within = (t - 24.0) - ci * 0.9;
+  S4.count.textContent = words[ci]; S4.count.setAttribute('fill', cols[ci]);
+  op(S4.count, counting ? (t < 26.7 ? 1 : 1 - seg(t, 26.7, 26.8)) : 0);
+  around(S4.count, 960, 560, counting ? lerp(0.6, 1, spring(clamp(within / 0.5))) : 1);
+  op(S4.countSub, counting ? seg(t, 24.2, 24.6) : 0);
+  // Alarma.
+  const alarm = t >= 26.8 && t < 29.6;
+  const blink = 0.5 + 0.5 * Math.sin((t - 26.8) * 2 * Math.PI * 2.5);
+  op(S4.bgRed, alarm ? 0.35 + 0.45 * blink : 0);
+  const pulse = 1 + 0.035 * Math.sin((t - 26.8) * 2 * Math.PI * 2.5);
+  op(S4.alarm1, alarm ? 1 : 0); op(S4.alarm2, alarm ? 1 : 0); op(S4.eas, alarm ? seg(t, 27.2, 27.6) : 0);
+  around(S4.alarm1, 960, 450, pulse); around(S4.alarm2, 960, 690, pulse);
+  // Recuperado.
+  const okOn = t >= 29.6;
+  op(S4.bgGreen, okOn ? 0.5 * (1 - seg(t, 29.6, 30.5) * 0.4) : 0);
+  const okp = spring(seg(t, 29.6, 30.1));
+  op(S4.ok, okOn ? 1 : 0); op(S4.ok2, okOn ? seg(t, 29.8, 30.1) : 0);
+  around(S4.ok, 960, 560, lerp(0.8, 1, okp));
+  op(S4.check, 0);
+}
+
+// ------------------------------------------------------------------ escena 5
+const S5 = {};
+{
+  const g = scenes.s5;
+  S5.head = text(g, 'DOS FORMAS DE MEDIR', 960, 190, 124, 'disp', C.ink, 'middle');
+  const card = (x, w) => el('rect', { x, y: 270, width: w, height: 600, rx: 36, fill: 'rgba(255,255,255,0.05)', stroke: 'rgba(255,240,230,0.14)', 'stroke-width': 2 }, g);
+  S5.cardL = card(140, 760); S5.cardR = card(1020, 760);
+  // Izquierda: torso con móvil en el bolsillo.
+  S5.L = el('g', {}, g);
+  S5.torso = el('path', { fill: 'none', 'stroke-linecap': 'round', 'stroke-width': 110 }, S5.L);
+  S5.headL = el('circle', { r: 56 }, S5.L);
+  S5.pocket = el('g', {}, S5.L);
+  el('rect', { x: -44, y: -62, width: 88, height: 150, rx: 16, fill: '#1b1412', stroke: C.orange, 'stroke-width': 5 }, S5.pocket);
+  el('rect', { x: -32, y: -46, width: 64, height: 100, rx: 6, fill: '#0e0908' }, S5.pocket);
+  S5.waves = [0, 1, 2].map((i) => el('path', { d: 'M62 -30 q26 30 0 60', stroke: C.orange, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, S5.pocket));
+  S5.lt1 = text(g, 'EN EL MÓVIL', 520, 800, 74, 'disp', C.ink, 'middle');
+  S5.lt2 = text(g, 'acelerómetro + giroscopio', 520, 848, 34, 'sans', C.dim, 'middle');
+  // Derecha: portátil con webcam.
+  S5.R = el('g', {}, g);
+  el('rect', { x: 1110, y: 330, width: 580, height: 360, rx: 22, fill: '#120c0a', stroke: C.line, 'stroke-width': 8 }, S5.R);
+  el('path', { d: 'M1060 716 H1740 L1712 750 H1088 Z', fill: C.line }, S5.R);
+  el('circle', { cx: 1400, cy: 345, r: 4, fill: C.green }, S5.R);
+  S5.bust = el('g', {}, S5.R);
+  S5.bustBody = el('path', { fill: '#3b2f2a' }, S5.bust);
+  S5.bustHead = el('ellipse', { rx: 54, ry: 66, fill: '#7a6258' }, S5.bust);
+  S5.tri = el('path', { fill: 'rgba(48,209,88,0.12)', 'stroke-width': 5, 'stroke-linejoin': 'round' }, S5.R);
+  S5.pts = [0, 1, 2, 3].map(() => el('circle', { r: 11 }, S5.R));
+  S5.rt1 = text(g, 'EN EL PORTÁTIL', 1400, 800, 74, 'disp', C.ink, 'middle');
+  S5.rt2 = text(g, 'webcam · MediaPipe Pose', 1400, 848, 34, 'sans', C.dim, 'middle');
+  S5.priv = text(g, 'El vídeo no sale de tu equipo.', 960, 975, 46, 'sansb', C.ink, 'middle');
+}
+function updateS5(t) {
+  op(scenes.s5, sceneAlpha(t, 30.5, 36.5, 0.3));
+  reveal(S5.head, t, 30.8, 0.6, 30);
+  op(S5.cardL, seg(t, 31.2, 31.7)); op(S5.cardR, seg(t, 31.5, 32.0));
+  const slouch = 0.5 - 0.5 * Math.cos(clamp((t - 32.2) / 2.4) * Math.PI * 2 * 0.5 + (t > 34.6 ? 0 : 0));
+  const s = clamp(easeInOut(seg(t, 32.2, 33.8)) * (1 - easeInOut(seg(t, 34.6, 35.6))));
+  const col = mix(C.green, C.red, s * 1.2);
+  // Torso del móvil.
+  const base = { x: 520, y: 740 };
+  const lean = s * 0.5;
+  const top = { x: base.x + 230 * Math.sin(lean), y: base.y - 300 * Math.cos(lean) + 0 };
+  S5.torso.setAttribute('d', `M${base.x} ${base.y} Q${base.x - 20 * s} ${(base.y + top.y) / 2} ${top.x} ${top.y}`);
+  S5.torso.setAttribute('stroke', mix('#3b2f2a', '#5a3a30', s));
+  S5.headL.setAttribute('cx', top.x + 40 * s); S5.headL.setAttribute('cy', top.y - 86 + 22 * s); S5.headL.setAttribute('fill', '#7a6258');
+  place(S5.pocket, lerp(base.x + 70, top.x + 70, 0.52), lerp(base.y - 60, top.y + 40, 0.5), 1, s * 28);
+  S5.waves.forEach((w, i) => { const k = ((t * 1.6 - i * 0.25) % 1 + 1) % 1; w.setAttribute('transform', `translate(${i * 14} 0)`); op(w, (1 - k) * 0.9 * seg(t, 31.8, 32.3)); });
+  op(S5.L, seg(t, 31.3, 31.9)); op(S5.R, seg(t, 31.6, 32.2));
+  reveal(S5.lt1, t, 32.0); reveal(S5.lt2, t, 32.3); reveal(S5.rt1, t, 32.2); reveal(S5.rt2, t, 32.5); reveal(S5.priv, t, 34.2);
+  // Busto en la webcam: baja y se acerca al encorvarse.
+  const cx = 1400, cy = 520 + 40 * s, k = 1 + 0.18 * s;
+  S5.bustHead.setAttribute('cx', cx); S5.bustHead.setAttribute('cy', cy - 60 * k + 26 * s);
+  S5.bustBody.setAttribute('d', `M${cx - 180 * k} ${700} Q${cx - 170 * k} ${cy + 20} ${cx} ${cy + 10} Q${cx + 170 * k} ${cy + 20} ${cx + 180 * k} ${700} Z`);
+  const lm = [[cx - 62 * k, cy - 70 * k + 26 * s], [cx + 62 * k, cy - 70 * k + 26 * s], [cx - 150 * k, cy + 60 * k], [cx + 150 * k, cy + 60 * k]];
+  S5.pts.forEach((p, i) => { p.setAttribute('cx', lm[i][0]); p.setAttribute('cy', lm[i][1]); p.setAttribute('fill', col); });
+  S5.tri.setAttribute('d', `M${lm[0][0]} ${lm[0][1]} L${lm[1][0]} ${lm[1][1]} L${lm[3][0]} ${lm[3][1]} L${lm[2][0]} ${lm[2][1]} Z`);
+  S5.tri.setAttribute('stroke', col); S5.tri.setAttribute('fill', col.replace('#', '#') + '20');
+  void slouch;
+}
+
+// ------------------------------------------------------------------ escena 6
+const S6 = {};
+{
+  const g = scenes.s6;
+  S6.head = text(g, '¿FUNCIONA DE VERDAD?', 960, 250, 148, 'disp', C.ink, 'middle');
+  S6.bars = [
+    { x: 560, col: C.orange, label: 'SIN AVISOS' }, { x: 1060, col: C.green, label: 'CON AVISOS' },
+  ].map((b) => {
+    const rect = el('rect', { x: b.x, width: 300, rx: 22, fill: b.col }, g);
+    const q = text(g, '?', b.x + 150, 0, 150, 'disp', '#fff', 'middle');
+    const lbl = text(g, b.label, b.x + 150, 935, 58, 'disp', C.ink, 'middle');
+    return { ...b, rect, q, lbl };
+  });
+  el('line', { x1: 480, x2: 1440, y1: 860, y2: 860, stroke: C.line, 'stroke-width': 4 }, g);
+  S6.sub = text(g, '% de tiempo encorvado', 960, 330, 44, 'sans', C.dim, 'middle');
+  S6.hyp = text(g, 'Hipótesis: un aviso inmediato corrige la postura.', 960, 1010, 42, 'sansb', C.ink, 'middle');
+}
+function updateS6(t) {
+  op(scenes.s6, sceneAlpha(t, 36.5, 42, 0.3));
+  reveal(S6.head, t, 36.8, 0.6, 30); reveal(S6.sub, t, 37.3);
+  S6.bars.forEach((b, i) => {
+    const grow = easeOut(seg(t, 37.4 + i * 0.25, 38.2 + i * 0.25));
+    const wob = smoothNoise(t * 2.1 + i * 7.3) * 0.5 + 0.25;
+    const h = 480 * grow * (wob + 0.15);
+    b.rect.setAttribute('y', 860 - h); b.rect.setAttribute('height', Math.max(0, h));
+    b.q.setAttribute('y', 860 - h - 30); op(b.q, grow);
+    reveal(b.lbl, t, 37.6 + i * 0.25);
+  });
+  S6.hyp.textContent = t < 40.3 ? 'Hipótesis: un aviso inmediato corrige la postura.' : 'Lo estamos midiendo: sesión de control vs. sesión con avisos.';
+  reveal(S6.hyp, t, 39.0);
+}
+
+// ------------------------------------------------------------------ escena 7
+const S7 = {};
+{
+  const g = scenes.s7;
+  S7.halo = el('circle', { cx: 540, cy: 400, r: 520, fill: 'url(#glowO)', opacity: 0.8 }, g);
+  S7.icon = el('g', {}, g);
+  el('rect', { x: 0, y: 0, width: 220, height: 220, rx: 52, fill: '#0a0706', stroke: 'rgba(255,240,230,0.2)', 'stroke-width': 3 }, S7.icon);
+  el('circle', { cx: 82, cy: 70, r: 23, fill: C.orange }, S7.icon);
+  el('path', { d: 'M80 98 C65 126 83 146 107 156', stroke: C.orange, 'stroke-width': 21, fill: 'none', 'stroke-linecap': 'round' }, S7.icon);
+  el('path', { d: 'M103 157 H158', stroke: C.orange, 'stroke-width': 21, fill: 'none', 'stroke-linecap': 'round' }, S7.icon);
+  S7.name = text(g, 'PostureFix', 140, 610, 230, 'disp', C.ink);
+  S7.ver = el('g', {}, g);
+  el('rect', { x: 140, y: 640, width: 140, height: 64, rx: 32, fill: C.orange }, S7.ver);
+  text(S7.ver, '2.1', 210, 686, 40, 'sansb', '#1F0C02', 'middle');
+  S7.chips = ['Android', 'Windows', 'Linux', 'Web'].map((s, i) => {
+    const row = el('g', {}, g);
+    const w = 40 + s.length * 21;
+    const x = 140 + [0, 224, 448, 630][i];
+    el('rect', { x, y: 750, width: w + 20, height: 72, rx: 36, fill: 'rgba(255,255,255,0.08)', stroke: 'rgba(255,240,230,0.2)', 'stroke-width': 2 }, row);
+    text(row, s, x + (w + 20) / 2, 798, 38, 'sansb', C.ink, 'middle');
+    return row;
+  });
+  S7.line = text(g, 'Gratis · Sin cuentas · Tu vídeo no sale de tu equipo', 140, 900, 38, 'sans', C.dim);
+  S7.fair = text(g, 'Proyecto para la feria de ciencias', 140, 990, 44, 'sansb', C.orange2);
+  S7.qr = el('g', {}, g);
+  el('rect', { x: 1300, y: 250, width: 460, height: 460, rx: 30, fill: '#fff' }, S7.qr);
+  const n = Number(/viewBox="0 0 (\d+) /.exec(QR_SVG)[1]);
+  const holder = el('g', { transform: `translate(1332 282) scale(${396 / n})` }, S7.qr);
+  const dark = /<path stroke="[^"]*" d="([^"]+)"/.exec(QR_SVG)[1];
+  el('path', { d: dark, stroke: '#0a0706', fill: 'none', 'shape-rendering': 'crispEdges' }, holder);
+  S7.qrCap = text(g, 'Escanéalo', 1530, 800, 64, 'disp', C.ink, 'middle');
+  S7.qrUrl = text(g, 'github.com/agus-blackops/PostureFix', 1530, 860, 30, 'sans', C.dim, 'middle');
+}
+function updateS7(t) {
+  op(scenes.s7, sceneAlpha(t, 42, 48, 0.3));
+  const p = spring(seg(t, 42.1, 43.0));
+  op(S7.icon, seg(t, 42.1, 42.3)); place(S7.icon, 140, 120, lerp(0.7, 1, p), 0, 0, 0);
+  reveal(S7.name, t, 42.5, 0.6, 30); reveal(S7.ver, t, 42.9, 0.5);
+  S7.chips.forEach((c, i) => {
+    const q = spring(seg(t, 43.4 + i * 0.18, 43.9 + i * 0.18));
+    op(c, seg(t, 43.4 + i * 0.18, 43.55 + i * 0.18));
+    c.setAttribute('transform', `translate(0 ${(1 - q) * 30})`);
+  });
+  reveal(S7.line, t, 44.7); reveal(S7.fair, t, 45.3);
+  const qp = spring(seg(t, 43.6, 44.4));
+  op(S7.qr, seg(t, 43.6, 43.9));
+  S7.qr.setAttribute('transform', `translate(1530 480) scale(${lerp(0.8, 1, qp)}) translate(-1530 -480)`);
+  reveal(S7.qrCap, t, 44.3); reveal(S7.qrUrl, t, 44.6);
+}
+
+// ------------------------------------------------------- 3D · A: la persona
+const OA = {};
+{
+  const g = scenes.a;
+  OA.l1 = text(g, 'Son las 5 de la tarde.', 140, 400, 46, 'sans', C.dim);
+  OA.l2a = text(g, 'LLEVAS 3 HORAS', 140, 560, 168, 'disp', C.ink);
+  OA.l2b = text(g, 'SENTADO.', 140, 700, 168, 'disp', C.ink);
+  OA.l3 = text(g, 'Y tu ', 140, 820, 66, 'sansb', C.ink);
+  OA.l3b = el('tspan', { fill: C.orange }, OA.l3); OA.l3b.textContent = 'espalda';
+  const t3 = el('tspan', { fill: C.ink }, OA.l3); t3.textContent = ' lo sabe.';
+  OA.deg = text(g, '0°', 0, 0, 120, 'disp', C.green, 'middle');
+}
+function updateA(t) {
+  op(scenes.a, sceneAlpha(t, 0, 7.2, 0.4) * (t < 0.01 ? 0 : 1));
+  reveal(OA.l1, t, 0.6); reveal(OA.l2a, t, 2.0, 0.6, 40); reveal(OA.l2b, t, 2.35, 0.6, 40); reveal(OA.l3, t, 4.4);
+  const s = (T3.screen.slouch || [0])[0];
+  const p = T3.screen.head || [1500, 300];
+  OA.deg.setAttribute('x', p[0]); OA.deg.setAttribute('y', p[1]);
+  OA.deg.textContent = `${Math.round(s * 38)}°`;
+  OA.deg.setAttribute('fill', mix(C.green, C.red, easeIn(s) * 1.1));
+  op(OA.deg, seg(t, 1.0, 1.8));
+}
+
+// ------------------------------------------------------- 3D · B: el título
+const OB = {};
+{
+  const g = scenes.b;
+  OB.title = text(g, 'PostureFix', 960, 590, 190, 'disp', C.ink, 'middle');
+  OB.tag = text(g, 'Te avisa antes de que te encorves.', 960, 960, 62, 'sansb', C.ink, 'middle');
+  OB.sub = text(g, 'App de móvil · Webcam · Gratis', 960, 1030, 36, 'sans', C.dim, 'middle');
+}
+function updateB(t) {
+  op(scenes.b, sceneAlpha(t, 7.0, 13.2, 0.25));
+  const tp = easeOut(seg(t, 7.0, 8.3));
+  op(OB.title, seg(t, 7.0, 7.2));
+  OB.title.setAttribute('letter-spacing', lerp(60, -2, tp).toFixed(1));
+  around(OB.title, 960, 540, lerp(1.12, 1, tp));
+  reveal(OB.tag, t, 8.9, 0.6); reveal(OB.sub, t, 10.0, 0.6);
+}
+
+// ------------------------------------------------------- 3D · C: el móvil
+const OC = {};
+{
+  const g = scenes.c;
+  OC.head = text(g, 'MIDE TU POSTURA', 140, 290, 126, 'disp', C.ink);
+  OC.b = [['Acelerómetro + giroscopio', 15.0], ['20 lecturas por segundo', 15.8], ['Calibración en dos pasos', 16.6]].map(([s, at], i) => {
+    const row = el('g', {}, g);
+    el('circle', { cx: 158, cy: 386 + i * 76 - 14, r: 11, fill: C.orange }, row);
+    text(row, s, 190, 386 + i * 76, 48, 'sans', C.ink);
+    return { row, at };
+  });
+  OC.grav = text(g, 'gravedad', 0, 0, 36, 'sansb', C.yellow, 'end');
+  OC.arc = text(g, '', 0, 0, 56, 'disp', C.ink, 'middle');
+  OC.over = el('g', {}, g);
+  OC.overBg = el('rect', { x: 140, y: 800, width: 560, height: 86, rx: 43, fill: C.red }, OC.over);
+  OC.overTx = text(OC.over, 'Umbral de 22° superado', 420, 858, 40, 'sansb', '#fff', 'middle');
+}
+function updateC(t) {
+  op(scenes.c, sceneAlpha(t, 13.0, 23.2, 0.3));
+  reveal(OC.head, t, 13.5, 0.6, 36);
+  OC.b.forEach((b) => reveal(b.row, t, b.at));
+  const ang = (T3.screen.ang || [0])[0];
+  const gp = T3.screen.grav || [1400, 400];
+  OC.grav.setAttribute('x', gp[0] - 36); OC.grav.setAttribute('y', gp[1]); op(OC.grav, seg(t, 14.6, 15.2));
+  const ap = T3.screen.arc || [900, 300];
+  OC.arc.setAttribute('x', ap[0]); OC.arc.setAttribute('y', ap[1]);
+  OC.arc.textContent = `${Math.round(ang)}°`;
+  OC.arc.setAttribute('fill', ang < 14 ? C.green : ang < 22 ? mix(C.green, C.yellow, (ang - 14) / 8) : mix(C.yellow, C.red, clamp((ang - 22) / 10)));
+  op(OC.arc, ang > 1 ? 1 : 0);
+  const over = ang > 22;
+  op(OC.over, over ? 1 : 0);
+  around(OC.over, 420, 843, lerp(0.9, 1, spring(seg(t, 13 + 4.6, 13 + 5.1))));
+}
+
+// ------------------------------------------------------- 3D · D: los ejes
+const OD = {};
+const D0 = 32.5;
+{
+  const g = scenes.d;
+  OD.head = text(g, 'CALIBRACIÓN EN DOS PASOS', 110, 150, 100, 'disp', C.ink);
+  OD.steps = ['1 · Espalda recta', '2 · Inclínate un poco', '3 · Listo'].map((s, i) => {
+    const row = el('g', {}, g);
+    const bg = el('rect', { x: 110 + i * 500, y: 200, width: 470, height: 70, rx: 35, fill: 'rgba(255,255,255,0.07)' }, row);
+    const tx = text(row, s, 110 + i * 500 + 235, 248, 34, 'sansb', C.dimmer, 'middle');
+    return { row, bg, tx };
+  });
+  OD.cap = text(g, '', 110, 340, 38, 'sans', C.dim);
+  OD.lUp = text(g, 'arriba', 0, 0, 40, 'sansb', C.green, 'middle');
+  OD.lFw = text(g, 'delante', 0, 0, 40, 'sansb', C.orange2, 'middle');
+  OD.lSd = text(g, 'lado', 0, 0, 40, 'sansb', C.blue || '#5AB0FF', 'middle');
+  OD.panel = el('g', {}, g);
+  el('rect', { x: 1350, y: 400, width: 530, height: 290, rx: 36, fill: 'rgba(10,7,6,0.72)', stroke: 'rgba(255,240,230,0.18)', 'stroke-width': 2 }, OD.panel);
+  text(OD.panel, 'AHORA LO SABE TODO', 1615, 455, 40, 'disp', C.dim, 'middle');
+  OD.r1 = text(OD.panel, '', 1385, 520, 32, 'sansb', C.orange2, 'start');
+  OD.r2 = text(OD.panel, '', 1385, 572, 32, 'sansb', '#5AB0FF', 'start');
+  OD.r3 = text(OD.panel, '', 1385, 652, 58, 'disp', C.green, 'start');
+}
+function updateD(t) {
+  const lt = t - D0;
+  op(scenes.d, sceneAlpha(t, D0, 48.0, 0.3));
+  reveal(OD.head, t, D0 + 0.3, 0.6, 30);
+  const stepNow = lt < 3.5 ? 0 : lt < 7.4 ? 1 : 2;
+  OD.steps.forEach((s, i) => {
+    const on = lt >= 0.9 + (i === 0 ? 0 : i === 1 ? 2.6 : 6.5) && i === stepNow, done = i < stepNow && lt > 0.9;
+    s.bg.setAttribute('fill', on ? (i === 0 ? C.green : i === 1 ? C.orange : '#5AB0FF') : done ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.07)');
+    s.tx.setAttribute('fill', on ? '#0A0706' : done ? C.dim : C.dimmer);
+    reveal(s.row, t, D0 + 0.6 + i * 0.15, 0.5, -16);
+  });
+  const caps = lt < 0.9 ? '' : lt < 3.5 ? 'Con la espalda recta, 3 segundos quieto: guarda dónde está «arriba».'
+    : lt < 7.4 ? 'Te inclinas un poco: así aprende dónde está «delante».'
+    : lt < 8.5 ? 'Con esos dos ejes calcula el tercero: «lado».'
+    : 'Ahora distingue hacia delante, hacia atrás y de lado.';
+  if (OD.cap.textContent !== caps) OD.cap.textContent = caps;
+  op(OD.cap, seg(t, D0 + 0.9, D0 + 1.4));
+  const lab = (e, name, from, to) => {
+    const p = T3.screen[name] || [0, 0];
+    e.setAttribute('x', p[0]); e.setAttribute('y', p[1]); op(e, seg(lt, from, to) * (lt > 3 ? 1 : 1));
+  };
+  lab(OD.lUp, 'up', 1.6, 2.1); lab(OD.lFw, 'fw', 5.6, 6.1); lab(OD.lSd, 'sd', 8.0, 8.5);
+  const pitch = (T3.screen.pitch || [0])[0], roll = (T3.screen.roll || [0])[0];
+  op(OD.panel, seg(lt, 8.5, 9.0));
+  OD.r1.textContent = pitch <= -0.5 ? `hacia atrás ${Math.round(-pitch)}° · no cuenta` : `hacia delante ${Math.round(Math.max(0, pitch))}°`;
+  OD.r1.setAttribute('fill', pitch <= -0.5 ? C.green : C.orange2);
+  OD.r2.textContent = `de lado ${Math.round(roll)}°`;
+  const bad = Math.hypot(Math.max(0, pitch), roll);
+  OD.r3.textContent = `mala postura ${Math.round(bad)}°`;
+  OD.r3.setAttribute('fill', bad >= 22 ? C.red : C.green);
+}
+
+// ------------------------------------------------------- 2D · más que un aviso
+const FE = {};
+const F0 = 59.5;
+{
+  const g = scenes.f;
+  FE.h1 = text(g, 'MÁS QUE UN AVISO', 960, 200, 150, 'disp', C.ink, 'middle');
+  const items = [
+    ['1', '3 perfiles', 'Sentado · De pie · En clase', C.orange],
+    ['2', 'Horario de vigilancia', 'Solo cuando tú quieres', C.green],
+    ['3', 'Aviso para levantarte', 'Cada 15 a 120 minutos', C.yellow],
+    ['4', 'Tema claro u oscuro', 'Como el de tu móvil', '#5AB0FF'],
+  ];
+  FE.cards = items.map(([n, title, sub, col], i) => {
+    const x = 120 + (i % 2) * 910, y = 330 + Math.floor(i / 2) * 330, row = el('g', {}, g);
+    el('rect', { x, y, width: 840, height: 280, rx: 48, fill: 'rgba(255,255,255,0.06)', stroke: 'rgba(255,240,230,0.16)', 'stroke-width': 2 }, row);
+    el('circle', { cx: x + 120, cy: y + 140, r: 70, fill: col }, row);
+    text(row, n, x + 120, y + 172, 96, 'disp', '#1F0C02', 'middle');
+    text(row, title, x + 230, y + 130, title.length > 24 ? 46 : 54, 'sansb', C.ink, 'start');
+    text(row, sub, x + 230, y + 190, 36, 'sans', C.dim, 'start');
+    return { row, at: F0 + 0.5 + i * 0.9 };
+  });
+}
+function updateF(t) {
+  op(scenes.f, sceneAlpha(t, F0, 64.5, 0.25));
+  reveal(FE.h1, t, F0 + 0.1, 0.5, 30);
+  FE.cards.forEach((c) => {
+    const p = spring(seg(t, c.at, c.at + 0.5));
+    op(c.row, seg(t, c.at, c.at + 0.12));
+    c.row.setAttribute('transform', `translate(0 ${(1 - p) * 60})`);
+  });
+}
+
+// ------------------------------------------------------- 2D · las indirectas
+const TE = {};
+const T0 = 64.5;
+{
+  const g = scenes.t;
+  TE.head = text(g, 'ALGUIEN NOS DEBE ALGO', 140, 230, 150, 'disp', C.ink);
+  TE.tag = text(g, '', 140, 450, 34, 'sansb', C.orange2);
+  TE.gA = text(g, '', 140, 600, 70, 'sansb', 'rgba(255,69,58,0.55)');
+  TE.gB = text(g, '', 140, 600, 70, 'sansb', 'rgba(90,176,255,0.55)');
+  TE.line = text(g, '', 140, 600, 70, 'sansb', C.ink);
+  TE.pre = el('tspan', { fill: C.ink }, TE.line);
+  TE.key = el('tspan', { fill: C.orange }, TE.line);
+  TE.suf = el('tspan', { fill: C.ink }, TE.line);
+  TE.hint = text(g, '', 140, 700, 40, 'sans', C.dim);
+  TE.items = [
+    { pre: 'En 2025 nos ganó un ', key: 'horno', suf: ' básico.', t0: 65.0, t1: 66.2, hint: 'Sí. Un horno.' },
+    { pre: 'Lo único que sube es la ', key: 'temperatura', suf: '.', t0: 66.2, t1: 67.4, hint: 'Y nadie te avisa de nada.' },
+    { pre: 'Aquí lo que sube es el ', key: 'ángulo', suf: '.', t0: 67.4, t1: 68.6, hint: 'Y esta vez sí te avisa.' },
+    { pre: 'Este año: ', key: 'revancha', suf: '.', t0: 68.6, t1: 69.8, hint: 'Con cariño y sin rencores.' },
+  ];
+  const oven = (ic, x, y, k = 1) => {
+    const o = el('g', { transform: `translate(${x} ${y}) scale(${k})` }, ic);
+    el('rect', { x: 0, y: 0, width: 440, height: 300, rx: 30, fill: '#2a2220', stroke: '#8a756c', 'stroke-width': 6 }, o);
+    el('rect', { x: 50, y: 90, width: 340, height: 170, rx: 18, fill: '#0e0908', stroke: C.orange, 'stroke-width': 5 }, o);
+    [90, 170, 250, 330].forEach((cx) => el('circle', { cx, cy: 45, r: 17, fill: '#5a4a44', stroke: '#8a756c', 'stroke-width': 3 }, o));
+    el('path', { d: 'M140 230 q20 -50 0 -90 M220 230 q20 -50 0 -90 M300 230 q20 -50 0 -90', stroke: C.orange2, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round', opacity: 0.8 }, o);
+    return o;
+  };
+  const ring = (ic, cx, cy, r, label) => {
+    el('circle', { cx, cy, r, fill: 'none', stroke: 'rgba(130,120,118,0.35)', 'stroke-width': r * 0.14 }, ic);
+    const a2 = -Math.PI / 2 + 0.55 * Math.PI * 2;
+    el('path', { d: `M${cx} ${cy - r} A${r} ${r} 0 1 1 ${cx + r * Math.cos(a2)} ${cy + r * Math.sin(a2)}`, fill: 'none', stroke: C.red, 'stroke-width': r * 0.14, 'stroke-linecap': 'round' }, ic);
+    text(ic, label, cx, cy + r * 0.28, r * 0.85, 'disp', C.ink, 'middle');
+  };
+  TE.icons = [0, 1, 2, 3].map((i) => {
+    const ic = el('g', { class: 'ic' }, g);
+    if (i === 0) { // el horno
+      oven(ic, 1290, 430);
+      text(ic, 'HORNO BÁSICO', 1510, 780, 64, 'disp', C.dim, 'middle');
+    } else if (i === 1) { // termómetro subiendo
+      oven(ic, 1230, 450, 0.7);
+      el('rect', { x: 1600, y: 430, width: 44, height: 280, rx: 22, fill: '#1b1412', stroke: C.red, 'stroke-width': 5 }, ic);
+      TE.mercury = el('rect', { x: 1610, y: 500, width: 24, height: 200, rx: 12, fill: C.red }, ic);
+      el('circle', { cx: 1622, cy: 722, r: 38, fill: C.red }, ic);
+      text(ic, '350°', 1622, 800, 64, 'disp', C.red, 'middle');
+    } else if (i === 2) { // el anillo de PostureFix
+      ring(ic, 1510, 580, 150, '38°');
+      text(ic, 'POSTUREFIX', 1510, 800, 64, 'disp', C.orange, 'middle');
+    } else { // revancha: el horno se encoge, el anillo crece
+      oven(ic, 1240, 540, 0.45);
+      text(ic, 'VS', 1470, 640, 90, 'disp', C.dim, 'middle');
+      ring(ic, 1630, 560, 140, '38°');
+    }
+    return ic;
+  });
+  TE.soon = text(g, 'REVANCHA.', 960, 700, 340, 'disp', C.ink, 'middle');
+}
+function updateT(t) {
+  op(scenes.t, sceneAlpha(t, T0, 71.0, 0.15));
+  reveal(TE.head, t, T0 + 0.2, 0.5, 30);
+  const idx = TE.items.findIndex((it) => t >= it.t0 && t < it.t1);
+  const it = TE.items[idx];
+  const soon = t >= 69.8;
+  if (it && !soon) {
+    const k = seg(t, it.t0, it.t0 + 0.55);
+    const redacted = it.key[0] + '█'.repeat(Math.max(0, it.key.length - 1));
+    const full = it.pre + redacted + it.suf;
+    const n = Math.floor(full.length * k);
+    const a = Math.min(n, it.pre.length), b = Math.min(Math.max(0, n - it.pre.length), redacted.length), c = Math.max(0, n - it.pre.length - redacted.length);
+    TE.pre.textContent = it.pre.slice(0, a); TE.key.textContent = redacted.slice(0, b); TE.suf.textContent = it.suf.slice(0, c);
+    const gl = (1 - seg(t, it.t0, it.t0 + 0.25)) * 14;
+    TE.gA.textContent = full.slice(0, n); TE.gB.textContent = full.slice(0, n);
+    TE.gA.setAttribute('x', 140 + gl); TE.gB.setAttribute('x', 140 - gl);
+    op(TE.gA, gl > 0.5 ? 1 : 0); op(TE.gB, gl > 0.5 ? 1 : 0);
+    op(TE.line, 1);
+    TE.tag.textContent = `SEÑAL ${idx + 1} DE 4`; op(TE.tag, 1);
+    TE.hint.textContent = it.hint; op(TE.hint, seg(t, it.t0 + 0.6, it.t0 + 0.9) * (1 - seg(t, it.t1 - 0.15, it.t1)));
+  } else { op(TE.line, 0); op(TE.gA, 0); op(TE.gB, 0); op(TE.tag, 0); op(TE.hint, 0); }
+  TE.icons.forEach((ic, i) => {
+    ic.setAttribute('data-i', i);
+    const on = idx === i && !soon;
+    op(ic, on ? seg(t, TE.items[i].t0 + 0.3, TE.items[i].t0 + 0.6) * (1 - seg(t, TE.items[i].t1 - 0.15, TE.items[i].t1)) : 0);
+    ic.setAttribute('transform', 'translate(-450 380) scale(0.8)');
+  });
+  if (TE.mercury) { const h = 40 + 200 * clamp((t - 66.5) / 0.8); TE.mercury.setAttribute('y', 700 - h); TE.mercury.setAttribute('height', h); }
+  // «PRONTO.» con un tembleque de glitch.
+  const sp = seg(t, 69.8, 70.4);
+  op(TE.soon, soon ? 1 : 0);
+  TE.soon.setAttribute('x', 960 + (soon && sp < 0.5 ? Math.sin(t * 160) * 14 * (1 - sp * 2) : 0));
+  TE.soon.setAttribute('fill', soon && sp < 0.35 ? C.orange : C.ink);
+  op(TE.head, soon ? 0 : TE.head.getAttribute('opacity'));
+}
+
+
+// ------------------------------------------------------- la pelea (3D + marcadores)
+const OF = {};
+const FIGHT0 = 71.0, FIGHT1 = 97.0;
+{
+  const g = scenes.fight;
+  OF.speed = el('g', {}, g);
+  OF.lines = Array.from({ length: 44 }, (_, i) => {
+    const a = (i / 44) * Math.PI * 2 + noise(i) * 0.1, r0 = 380 + noise(i * 3) * 200, r1 = 1250 + noise(i * 7) * 400;
+    return el('line', { x1: 960 + Math.cos(a) * r0, y1: 540 + Math.sin(a) * r0 * 0.62, x2: 960 + Math.cos(a) * r1, y2: 540 + Math.sin(a) * r1 * 0.62, stroke: '#fff', 'stroke-width': 3 + noise(i * 11) * 7, 'stroke-linecap': 'round' }, OF.speed);
+  });
+  OF.hud = el('g', {}, g);
+  OF.nameO = text(OF.hud, 'HORNO BÁSICO', 120, 72, 46, 'disp', C.ink, 'start');
+  OF.nameH = text(OF.hud, 'POSTUREFIX', 1800, 72, 46, 'disp', C.orange, 'end');
+  el('rect', { x: 120, y: 90, width: 700, height: 38, rx: 19, fill: 'rgba(255,255,255,0.12)' }, OF.hud);
+  OF.barO = el('rect', { x: 120, y: 90, width: 700, height: 38, rx: 19, fill: C.red }, OF.hud);
+  el('rect', { x: 1100, y: 90, width: 700, height: 38, rx: 19, fill: 'rgba(255,255,255,0.12)' }, OF.hud);
+  OF.barH = el('rect', { x: 1100, y: 90, width: 700, height: 38, rx: 19, fill: C.green }, OF.hud);
+  OF.vs = text(OF.hud, 'VS', 960, 128, 76, 'disp', C.ink, 'middle');
+  OF.status = text(OF.hud, 'ENCORVADO', 1800, 172, 44, 'sansb', C.red, 'end');
+  OF.rage = text(OF.hud, 'SOBRECALENTADO', 120, 172, 44, 'sansb', C.orange, 'start');
+  OF.nO = text(g, 'HORNO BÁSICO', 480, 880, 150, 'disp', C.red, 'middle');
+  OF.nH = text(g, 'POSTUREFIX', 1440, 880, 150, 'disp', C.orange, 'middle');
+  OF.round = text(g, 'RONDA FINAL', 960, 560, 250, 'disp', C.ink, 'middle');
+  OF.go = text(g, '¡PELEA!', 960, 620, 340, 'disp', C.orange, 'middle');
+  OF.pops = [
+    ['¡PUÑO CALIENTE!', 3.8, 'oven', C.red, 84], ['PITIDO', 4.8, 'hero', C.yellow, 84], ['¡CALOR!', 6.0, 'oven', C.red, 84],
+    ['UNO', 7.4, 'hero', C.yellow, 90], ['DOS', 7.9, 'hero', C.orange2, 100], ['TRES', 8.4, 'hero', C.red, 112],
+    ['¡SOBRECALENTADO!', 9.4, 'oven', C.red, 96], ['¡MEGA LLAMARADA!', 10.9, 'oven', C.red, 96], ['¡PISOTÓN!', 12.4, 'oven', C.red, 100],
+    ['¡ZAS!', 16.9, 'oven', C.yellow, 110], ['¡ZAS!', 17.1, 'oven', C.orange2, 120], ['¡ZAS!', 17.3, 'oven', C.red, 130],
+    ['¡ALARMA EAS!', 18.6, 'hero', '#ffffff', 100],
+  ].map(([label, at, who, fill, size]) => ({ at, who, e: text(g, label, 0, 0, size, 'disp', fill, 'middle') }));
+  OF.tired = text(g, 'TE ESTÁS ENCORVANDO…', 960, 880, 110, 'disp', 'rgba(255,255,255,0.8)', 'middle');
+  OF.straight = text(g, '¡ENDEREZA LA ESPALDA!', 960, 540, 170, 'disp', C.ink, 'middle');
+  OF.ko = text(g, 'K.O.', 960, 700, 560, 'disp', C.red, 'middle');
+  OF.win = text(g, 'POSTUREFIX GANA', 960, 900, 150, 'disp', C.ink, 'middle');
+  OF.joke = text(g, 'Es una broma: ¡suerte a todos!', 960, 1000, 46, 'sans', C.dim, 'middle');
+}
+function updateFight(t) {
+  const f = t - FIGHT0;
+  op(scenes.fight, sceneAlpha(t, FIGHT0, FIGHT1, 0.3));
+  const hpO = (T3.screen.hpOven || [100])[0], hpH = (T3.screen.hpHero || [100])[0];
+  OF.barO.setAttribute('width', (7 * hpO).toFixed(1));
+  OF.barH.setAttribute('x', (1100 + 7 * (100 - hpH)).toFixed(1)); OF.barH.setAttribute('width', (7 * hpH).toFixed(1));
+  OF.barO.setAttribute('fill', hpO < 30 ? C.yellow : C.red);
+  const low = hpH < 20;
+  OF.barH.setAttribute('fill', low ? (Math.floor(f * 6) % 2 ? C.red : '#7a1812') : hpH < 40 ? C.yellow : C.green);
+  op(OF.hud, seg(f, 0.3, 0.8));
+  op(OF.status, f >= 11.7 && f < 15.3 ? (Math.floor(f * 4) % 2 ? 1 : 0.4) : 0);
+  op(OF.rage, f >= 9.4 && f < 20.1 ? 1 : 0);
+  // Presentación de los dos.
+  op(OF.nO, seg(f, 0.8, 0.9) * (1 - seg(f, 2.0, 2.2))); around(OF.nO, 480, 820, lerp(1.5, 1, spring(seg(f, 0.8, 1.2))));
+  op(OF.nH, seg(f, 1.4, 1.5) * (1 - seg(f, 2.0, 2.2))); around(OF.nH, 1440, 820, lerp(1.5, 1, spring(seg(f, 1.4, 1.8))));
+  const r = seg(f, 2.4, 2.5) * (1 - seg(f, 3.0, 3.2));
+  op(OF.round, r); around(OF.round, 960, 470, lerp(1.4, 1, spring(seg(f, 2.4, 2.8))));
+  const go = seg(f, 3.2, 3.3) * (1 - seg(f, 3.9, 4.1));
+  op(OF.go, go); around(OF.go, 960, 500, lerp(1.5, 1, spring(seg(f, 3.2, 3.6))));
+  OF.pops.forEach((p) => {
+    const k = seg(f, p.at, p.at + 0.9);
+    const pos = (p.who === 'oven' ? T3.screen.oven : T3.screen.hero) || [960, 300];
+    op(p.e, k > 0 && k < 1 ? Math.min(1, (1 - k) * 3) : 0);
+    const px = clamp(pos[0] + (p.who === 'oven' ? 330 : -330), 300, 1620), py = clamp(pos[1] + 80 - 40 * k, 330, 700);
+    p.e.setAttribute('x', px); p.e.setAttribute('y', py);
+    around(p.e, px, py - 30, lerp(1.6, 1, spring(clamp(k * 3))));
+  });
+  op(OF.tired, f >= 13.5 && f < 15.2 ? Math.min(1, seg(f, 13.5, 14.0)) * (0.6 + 0.4 * Math.sin(f * 7)) : 0);
+  const st = seg(f, 15.2, 15.3) * (1 - seg(f, 16.0, 16.4));
+  op(OF.straight, st); around(OF.straight, 960, 440, lerp(1.7, 1, spring(seg(f, 15.2, 15.7))));
+  const ko = seg(f, 20.1, 20.2) * (1 - seg(f, 21.2, 21.7));
+  op(OF.ko, ko); around(OF.ko, 960, 480, lerp(2.2, 1, spring(seg(f, 20.1, 20.7))));
+  reveal(OF.win, t, FIGHT0 + 22.4, 0.5, 40); reveal(OF.joke, t, FIGHT0 + 24.0, 0.5, 20);
+  // Líneas de velocidad.
+  const sp = (T3.screen.speed || [0])[0];
+  op(OF.speed, sp * 0.7);
+  OF.lines.forEach((l, i) => l.setAttribute('transform', `translate(${(noise(i + Math.floor(f * 20)) - 0.5) * 24} 0)`));
+}
+
+// -------------------------------------------------------------------- tiempo
+function setT(t) {
+  t = clamp(t, 0, DURATION);
+  T3.render(t);
+  updateA(t); updateB(t); updateC(t); updateD(t);
+  updateS4(t - 2); updateS5(t - 17.5); updateS6(t - 17.5);
+  updateF(t); updateT(t); updateFight(t); updateS7(t - 55);
+  const alarm = t >= 28.8 && t < 31.6;
+  op(glow1, 0.55 - 0.25 * seg(t, 23, 26) + 0.2 * seg(t, 32.5, 33));
+  op(glow2, 0.3 + 0.5 * seg(t, 18.8, 23) * (1 - seg(t, 23, 23.2)) + (alarm ? 0.5 : 0));
+  let f = 0, sx = 0, sy = 0;
+  const hit = (t0, power, dur = 0.4) => {
+    const k = (t - t0) / dur;
+    if (k < 0 || k > 1) return;
+    f = Math.max(f, power * (1 - k) * (1 - k));
+    const a = power * 26 * (1 - k) * (1 - k);
+    sx += Math.sin(t * 90) * a; sy += Math.cos(t * 77) * a;
+  };
+  hit(7.0, 0.9, 0.6); hit(23.5, 0.25, 0.2); hit(28.8, 0.5, 0.4); hit(31.6, 0.45, 0.5); hit(69.8, 0.35, 0.4); hit(71.0, 0.5, 0.5);
+  [5.05, 6.7, 7.65, 8.15, 8.65, 11.6, 13.0, 16.9, 17.1, 17.3].forEach((x) => hit(FIGHT0 + x, 0.2, 0.2));
+  hit(FIGHT0 + 9.3, 0.45, 0.5); hit(FIGHT0 + 12.4, 0.4, 0.4); hit(FIGHT0 + 15.3, 0.7, 0.6); hit(FIGHT0 + 20.1, 1.0, 0.7); hit(FIGHT1, 0.5, 0.5);
+  op(flash, f); shake.style.transform = `translate(${sx.toFixed(2)}px, ${sy.toFixed(2)}px)`;
+  op(fade, Math.max(1 - seg(t, 0, 0.8), seg(t, 102.1, 103)));
+}
+window.setT = setT;
+window.DURATION = DURATION;
+
+window.ready = Promise.all([
+  document.fonts.load('800 40px Inter'), document.fonts.load('600 40px Inter'), document.fonts.load('900 40px "Big Shoulders Display"'),
+]);
+function fit() {
+  const k = Math.min(innerWidth / W, innerHeight / H);
+  document.getElementById('wrap').style.transform = `translate(-50%, -50%) scale(${k})`;
+}
+addEventListener('resize', fit); fit();
+window.ready.then(() => setT(0));
+if (!location.search.includes('manual')) {
+  const hint = document.createElement('div');
+  hint.textContent = 'Pulsa para ver el tráiler';
+  hint.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:600 28px Inter,sans-serif;background:rgba(0,0,0,.6);cursor:pointer';
+  document.body.appendChild(hint);
+  hint.addEventListener('click', () => {
+    hint.remove();
+    const t0 = performance.now();
+    (function loop() { const t = (performance.now() - t0) / 1000; setT(t); if (t < DURATION) requestAnimationFrame(loop); })();
+  });
+}
+</script>
+</body>
+</html>

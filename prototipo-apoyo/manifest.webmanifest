@@ -1,0 +1,14 @@
+{
+  "name": "Apoyo Ya",
+  "short_name": "Apoyo Ya",
+  "description": "Apoyo frente a la angustia y el acoso escolar. Todo se guarda en tu dispositivo.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#3b6fd8",
+  "lang": "es",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
